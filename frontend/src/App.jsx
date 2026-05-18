@@ -345,7 +345,7 @@ export default function App() {
             }}>
               <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Dosyayı yüklemeden önce kontrol edin:</div>
               <div>📅 <strong>Tarih aralığı:</strong> Son 3 tamamlanmış ay — örneğin <strong>{info ? info.rapor_araligi_str : "..."}</strong></div>
-              <div>📊 <strong>Rapor türü:</strong> Eczanem → Raporlar → <strong>Ürün Bazında Toplamlar</strong></div>
+              <div>📊 <strong>Rapor türü:</strong> Eczanem → Raporlar → Satış Raporları → <strong>Ürün Bazında Toplamlar</strong></div>
               <div>📁 <strong>Format:</strong> Excel olarak indirin (.xls veya .xlsx)</div>
             </div>
             <DropZone onFile={handleFile} loading={loading} />
