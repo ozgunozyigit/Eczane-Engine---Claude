@@ -166,10 +166,28 @@ export default function App() {
   }, []);
 
   const handleFile = useCallback((f) => {
-    setFile(f);
     setResult(null);
     setError(null);
+    const allowedExt = [".xls", ".xlsx"];
+    const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+    if (!allowedExt.includes(ext)) {
+      setError(`❌ Geçersiz dosya formatı: "${f.name}"\n\nSadece Excel dosyası (.xls veya .xlsx) yüklenebilir. Eczanem'den raporu Excel formatında indirdiğinizden emin olun.`);
+      setFile(null);
+      return;
+    }
+    setFile(f);
   }, []);
+
+  const formatError = (msg) => {
+    if (!msg) return "Bilinmeyen bir hata oluştu.";
+    if (msg.includes("Dosya okunamadı") || msg.includes("Excel"))
+      return "❌ Dosya okunamadı.\n\nLütfen şunları kontrol edin:\n• Eczanem → Raporlar → Ürün Bazında Toplamlar raporunu seçtiniz mi?\n• Dosya Excel formatında (.xls / .xlsx) mı kaydedildi?\n• Dosya başka bir program tarafından açık değil mi?";
+    if (msg.includes("sütun") || msg.includes("column") || msg.includes("A,B,F"))
+      return "❌ Dosya yapısı uyumsuz.\n\nBu rapor 'Ürün Bazında Toplamlar' formatında değil. A sütunu Ürün Adı, B sütunu 3 aylık satış, F sütunu Stok Miktarı olmalıdır.";
+    if (msg.includes("tarih") || msg.includes("3 ay"))
+      return "❌ Tarih aralığı hatalı.\n\nLütfen son 3 tamamlanmış ayı seçin." + (info ? ` Doğru aralık: ${info.rapor_araligi_str}` : "");
+    return `❌ Hata: ${msg}`;
+  };
 
   const handleHesapla = async () => {
     if (!file) return;
@@ -185,7 +203,7 @@ export default function App() {
       setResult(data);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (e) {
-      setError(e.message);
+      setError(formatError(e.message));
     } finally {
       setLoading(false);
     }
@@ -256,19 +274,60 @@ export default function App() {
         {/* Info + Upload Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
 
-          {/* Info card */}
-          <div style={{ background: "#fff", borderRadius: 14, padding: 24, boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 14 }}>📌 Rapor Bilgisi</div>
-            {info ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <InfoRow label="Seçilmesi gereken rapor aralığı" value={info.rapor_araligi_str} highlight />
-                <InfoRow label="Bugün" value={info.bugun_str} />
-                <InfoRow label={`${info.aktif_ay} ayı toplam iş günü`} value={info.toplam_is_gunu} />
-                <InfoRow label="Kalan resmi iş günü" value={info.kalan_is_gunu} accent />
+          {/* Info + Guide card */}
+          <div style={{ background: "#fff", borderRadius: 14, padding: 24, boxShadow: "0 2px 10px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Tarih bilgisi */}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 10 }}>📌 Bu Ay Rapor Aralığı</div>
+              {info ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ background: "#EFF6FF", borderRadius: 8, padding: "10px 14px", border: "1px solid #BFDBFE" }}>
+                    <div style={{ fontSize: 11, color: "#3B82F6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Seçilmesi Gereken Tarih Aralığı</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1E40AF" }}>{info.rapor_araligi_str}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ flex: 1, background: "#F8FAFC", borderRadius: 8, padding: "8px 12px", border: "1px solid #E2E8F0", textAlign: "center" }}>
+                      <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>TOPLAM İŞ GÜNÜ</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", fontFamily: "'DM Mono', monospace" }}>{info.toplam_is_gunu}</div>
+                    </div>
+                    <div style={{ flex: 1, background: "#F0FDF4", borderRadius: 8, padding: "8px 12px", border: "1px solid #BBF7D0", textAlign: "center" }}>
+                      <div style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>KALAN İŞ GÜNÜ</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#15803D", fontFamily: "'DM Mono', monospace" }}>{info.kalan_is_gunu}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ color: "#94A3B8", fontSize: 13 }}>Bağlanılıyor...</div>
+              )}
+            </div>
+
+            {/* Adım adım kılavuz */}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 10 }}>📋 Nasıl Kullanılır?</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { n: 1, text: "Eczanem programını açın" },
+                  { n: 2, text: "Üst menüden Raporlar → Satış Raporları seçin" },
+                  { n: 3, text: <span>Tarih aralığını seçin: <strong style={{ color: "#2563EB" }}>{info ? info.rapor_araligi_str : "son 3 tamamlanmış ay"}</strong></span> },
+                  { n: 4, text: "Sol sekmeden Ürün Bazında Toplamlar'ı seçin" },
+                  { n: 5, text: "Excel olarak kaydedin (.xls veya .xlsx)" },
+                  { n: 6, text: "Sağdaki alana yükleyin ve butona tıklayın" },
+                ].map(s => (
+                  <div key={s.n} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#374151" }}>
+                    <span style={{
+                      minWidth: 22, height: 22, borderRadius: "50%",
+                      background: "#2563EB", color: "#fff",
+                      fontSize: 11, fontWeight: 800,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      marginTop: 1, flexShrink: 0,
+                    }}>{s.n}</span>
+                    <span style={{ lineHeight: 1.6 }}>{s.text}</span>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div style={{ color: "#94A3B8", fontSize: 13 }}>Backend'e bağlanılıyor...</div>
-            )}
+            </div>
+
           </div>
 
           {/* Upload card */}
@@ -319,8 +378,8 @@ export default function App() {
               {loading ? "⏳ Hesaplanıyor..." : "🚀 Sipariş Listesini Oluştur"}
             </button>
             {error && (
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF2F2", borderRadius: 8, color: "#B91C1C", fontSize: 13, border: "1px solid #FECACA" }}>
-                ⚠️ {error}
+              <div style={{ marginTop: 12, padding: "12px 14px", background: "#FEF2F2", borderRadius: 8, color: "#B91C1C", fontSize: 13, border: "1px solid #FECACA", lineHeight: 1.8, whiteSpace: "pre-line" }}>
+                {error}
               </div>
             )}
           </div>
