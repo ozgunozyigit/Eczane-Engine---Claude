@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const API = "http://localhost:8000";
+const API = "https://eczane-engine-claude.onrender.com";
 
 const STATUS_CONFIG = {
   "ACİL":      { bg: "#FFF0EC", text: "#C0392B", border: "#E74C3C", badge: "#E74C3C", label: "ACİL" },
