@@ -274,6 +274,21 @@ export default function App() {
           {/* Upload card */}
           <div style={{ background: "#fff", borderRadius: 14, padding: 24, boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
             <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 14 }}>📂 Dosya Yükle</div>
+            <div style={{
+              background: "#FFF7ED",
+              border: "1px solid #FED7AA",
+              borderRadius: 8,
+              padding: "12px 14px",
+              marginBottom: 14,
+              fontSize: 13,
+              color: "#92400E",
+              lineHeight: 1.8,
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Dosyayı yüklemeden önce kontrol edin:</div>
+              <div>📅 <strong>Tarih aralığı:</strong> Son 3 tamamlanmış ay — örneğin <strong>{info ? info.rapor_araligi_str : "..."}</strong></div>
+              <div>📊 <strong>Rapor türü:</strong> Eczanem → Raporlar → <strong>Ürün Bazında Toplamlar</strong></div>
+              <div>📁 <strong>Format:</strong> Excel olarak indirin (.xls veya .xlsx)</div>
+            </div>
             <DropZone onFile={handleFile} loading={loading} />
             {file && (
               <div style={{ marginTop: 12, fontSize: 13, color: "#374151", display: "flex", alignItems: "center", gap: 8 }}>
