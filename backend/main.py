@@ -239,6 +239,11 @@ def siparis_hesapla(file_bytes: bytes):
     haric = sonuc[sonuc["liste_disi"] == True].copy()
     sonuc = sonuc[sonuc["liste_disi"] == False].copy()
 
+    # Yaz ayı kontrolü (Haziran=6, Temmuz=7, Ağustos=8)
+    YAZ_AYLARI = {6, 7, 8}
+    YAZ_INDIRIMI = 0.20
+    yaz_ayi_mi = bugun.month in YAZ_AYLARI
+
     sonuc["ortalama_satis"] = (sonuc["toplam_3ay_satis"] / 3).round(2)
     sonuc["hesap_stok"] = sonuc["stok"].apply(lambda x: max(x, 0))
     sonuc["ortalama_gunluk_satis"] = (sonuc["ortalama_satis"] / 22).round(4)
@@ -246,6 +251,12 @@ def siparis_hesapla(file_bytes: bytes):
     sonuc["ham_siparis_miktari"] = sonuc.apply(
         lambda row: max(0, math.ceil(row["kalan_ay_ihtiyaci"] - row["hesap_stok"])), axis=1
     )
+
+    # Yaz ayındaysa toplam sipariş miktarına %20 indirim uygula
+    if yaz_ayi_mi:
+        sonuc["ham_siparis_miktari"] = sonuc["ham_siparis_miktari"].apply(
+            lambda x: max(0, math.ceil(x * (1 - YAZ_INDIRIMI))) if x > 0 else 0
+        )
 
     def parca_sayisi_belirle(h):
         if h > 300: return 7
@@ -509,6 +520,7 @@ async def hesapla(file: UploadFile = File(...)):
             "gerek_yok": int((sonuc["siparis_durumu"] == "GEREK YOK").sum()),
             "liste_disi": len(haric),
             "kalan_is_gunu": kalan_is_gunu,
+            "yaz_ayi_indirimi": bugun.month in {6, 7, 8},
         }
     }
 
