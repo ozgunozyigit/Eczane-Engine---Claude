@@ -279,9 +279,13 @@ export default function App() {
 
             {/* Tarih bilgisi */}
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 10 }}>📌 Bu Ay Rapor Aralığı</div>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 10 }}>📌 Satış Raporu Bilgileri</div>
               {info ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ background: "#F8FAFC", borderRadius: 8, padding: "8px 14px", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>📅 Bugünün Tarihi</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>{info.bugun_str}</span>
+                  </div>
                   <div style={{ background: "#EFF6FF", borderRadius: 8, padding: "10px 14px", border: "1px solid #BFDBFE" }}>
                     <div style={{ fontSize: 11, color: "#3B82F6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Seçilmesi Gereken Tarih Aralığı</div>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "#1E40AF" }}>{info.rapor_araligi_str}</div>
