@@ -32,8 +32,14 @@ LISTE_DISI_BASLANGICLAR_RAW = [
     "PEPTAMEN", "PHYSIONEAL", "RESOURCE", "ENJEKTOR", "MAJISTRAL", "SENTE",
     "SARIINTRAKET", "INFATRINI", "VITAL", "SANITAYARA", "OCEAN", "NUXE", "NBTLIFE", "NUTRAXIN",
     "SOLGAR", "VELAVIT", "BIOXCIN", "CERAVE", "DERMOSKIN", "DINAMIS", "DYNAVIT", "EASYFISH", "MEDICAGO",
-    "MOLLERS", "MUSTELA", "NATURESBOUNTY", "REDEXON", "ROLL", "SENSODYNE", "SIHHAT", "TOPICREM", "TTO", "VICHY"
+    "MOLLERS", "MUSTELA", "NATURESBOUNTY", "REDEXON", "ROLL", "SENSODYNE", "SIHHAT", "TOPICREM", "TTO", "VICHY",
     "ZADEVITAL", "WELLCARE", "AYSET",
+    "NEWLIFE", "STREPSILS", "CURAPROX", "INTRAKET", "ACTIVE PLUS", "ARGIVIT", "BEPANTHOL",
+    "CAN PED", "CAPICADE", "CAUDALIE", "DAY 2", "DUCRAY", "ENTEROGERMINA", "GOODDAY",
+    "GRIPIN", "IMUNEKS", "IMUNOL", "NBL", "NIVEA", "NTB", "NOW", "NYXON", "OKEY",
+    "PARADONTAX", "REDOXON", "SKINCEUT", "SMARTUP", "SORVAGEN", "STERIMAR", "SUPRADYN",
+    "PHARMATON", "TABIA", "TABVITAMIN", "TURKFLEKS", "UMCA", "VEDEXA", "VENATURA",
+    "VERISCA", "WEE",
 ]
 
 TURKCE_AYLAR = {
@@ -247,6 +253,8 @@ def siparis_hesapla(file_bytes: bytes):
     YAZ_INDIRIMI = 0.20
     yaz_ayi_mi = bugun.month in YAZ_AYLARI
 
+    STOK_CAP = 50
+
     sonuc["ortalama_satis"] = (sonuc["toplam_3ay_satis"] / 3).round(2)
     sonuc["hesap_stok"] = sonuc["stok"].apply(lambda x: max(x, 0))
     sonuc["ortalama_gunluk_satis"] = (sonuc["ortalama_satis"] / 22).round(4)
@@ -261,18 +269,9 @@ def siparis_hesapla(file_bytes: bytes):
             lambda x: max(0, math.ceil(x * (1 - YAZ_INDIRIMI))) if x > 0 else 0
         )
 
-    def parca_sayisi_belirle(h):
-        if h > 300: return 7
-        elif h > 250: return 6
-        elif h > 200: return 5
-        elif h > 150: return 4
-        elif h > 100: return 3
-        elif h > 60: return 2
-        else: return 1
-
-    sonuc["parca_sayisi"] = sonuc["ham_siparis_miktari"].apply(parca_sayisi_belirle)
-    sonuc["planlanan_siparis_miktari"] = sonuc.apply(
-        lambda row: math.ceil(row["ham_siparis_miktari"] / row["parca_sayisi"]) if row["ham_siparis_miktari"] > 0 else 0, axis=1
+    # Parti sipariş = MIN(50, ham sipariş) — raf kapasitesi 50 ile sınırlı
+    sonuc["planlanan_siparis_miktari"] = sonuc["ham_siparis_miktari"].apply(
+        lambda x: min(STOK_CAP, x) if x > 0 else 0
     )
     sonuc["siparis_durumu"] = sonuc.apply(siparis_durumu_belirle, axis=1)
     sonuc["siparis_onceligi"] = sonuc["siparis_durumu"].map({"ACİL": 1, "SİPARİŞ": 2, "GEREK YOK": 3}).fillna(99)
@@ -288,13 +287,11 @@ def siparis_hesapla(file_bytes: bytes):
 def df_to_excel_bytes(sonuc: pd.DataFrame, haric: pd.DataFrame) -> bytes:
     from openpyxl.styles import Font, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
-    from openpyxl.worksheet.table import Table, TableStyleInfo
 
     cols_map = {
         "gorunen_urun_adi": "Ürün Adı",
         "planlanan_siparis_miktari": "Parti Sipariş Mik.",
         "ham_siparis_miktari": "Top. Sipariş Mik.",
-        "parca_sayisi": "Parti Sayısı",
         "toplam_3ay_satis": "3 Aylık Satış",
         "ortalama_satis": "Ort. Aylık Satış",
         "stok": "Stok",
@@ -319,27 +316,21 @@ def df_to_excel_bytes(sonuc: pd.DataFrame, haric: pd.DataFrame) -> bytes:
             haric_out.to_excel(writer, index=False, sheet_name="Listeden Çıkarılanlar")
 
         for sheet_name, ws in writer.sheets.items():
+            # Header stili
             for cell in ws[1]:
                 cell.font = Font(bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Hücre hizalama
             for row in ws.iter_rows(min_row=2):
                 for cell in row:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Sütun genişlikleri
             for col_cells in ws.columns:
                 max_len = max((len(str(c.value or "")) for c in col_cells), default=0)
                 ws.column_dimensions[col_cells[0].column_letter].width = min(max_len + 2, 45)
             ws.freeze_panes = "A2"
 
-            max_row = ws.max_row
-            max_col = ws.max_column
-            if max_row >= 1 and max_col >= 1:
-                last_col = get_column_letter(max_col)
-                safe_name = re.sub(r"[^A-Za-z0-9]", "", sheet_name)
-                tbl = Table(displayName=f"Tbl_{safe_name}", ref=f"A1:{last_col}{max_row}")
-                tbl.tableStyleInfo = TableStyleInfo(name="TableStyleMedium9", showRowStripes=False)
-                ws.add_table(tbl)
-
-        # Color rows in Sipariş Sonuç
+        # Renklendirme sadece Sipariş Sonuç sayfasında
         ws = writer.sheets["Sipariş Sonuç"]
         durum_col = None
         for cell in ws[1]:
@@ -494,7 +485,7 @@ async def hesapla(file: UploadFile = File(...)):
         return v
 
     cols_out = ["gorunen_urun_adi", "planlanan_siparis_miktari", "ham_siparis_miktari",
-                "parca_sayisi", "toplam_3ay_satis", "ortalama_satis", "stok", "siparis_durumu"]
+                "toplam_3ay_satis", "ortalama_satis", "stok", "siparis_durumu"]
     cols_out = [c for c in cols_out if c in sonuc.columns]
     sonuc_records = sonuc[cols_out].rename(columns={
         "gorunen_urun_adi": "urun_adi",
