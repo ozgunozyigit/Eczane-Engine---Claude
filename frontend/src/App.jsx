@@ -88,9 +88,8 @@ function Table({ rows, search }) {
   const cols = [
     { key: "urun_adi",     label: "Ürün Adı",         align: "left",   w: "auto" },
     { key: "durum",        label: "Durum",             align: "center", w: 110 },
-    { key: "parti_siparis",label: "Parti Sip.",        align: "center", w: 90 },
-    { key: "toplam_siparis",label:"Top. Sip.",         align: "center", w: 90 },
-    { key: "parti_sayisi", label: "Parti #",           align: "center", w: 70 },
+    { key: "parti_siparis",label: "Parti Sip.",        align: "center", w: 100 },
+    { key: "toplam_siparis",label:"Top. Sip.",         align: "center", w: 100 },
     { key: "satis_3ay",    label: "3 Ay Satış",        align: "center", w: 95 },
     { key: "ort_aylik",    label: "Ort. Aylık",        align: "center", w: 90 },
     { key: "stok",         label: "Stok",              align: "center", w: 70 },
