@@ -27,13 +27,10 @@ app.add_middleware(
 # =========================================================
 
 LISTE_DISI_BASLANGICLAR_RAW = [
-    "BIODERMA", "CUBITAN", "DIASIP", "ENSURE", "FORTIMEL", "FORTINI",
-    "GLUCERNA", "IMPACT", "LAROCHE", "NUTRISON", "NUTRIVIGOR", "PEDIASURE",
+    "CUBITAN", "DIASIP", "ENSURE", "FORTIMEL", "FORTINI",
+    "GLUCERNA", "IMPACT", "NUTRISON", "NUTRIVIGOR", "PEDIASURE",
     "PEPTAMEN", "PHYSIONEAL", "RESOURCE", "ENJEKTOR", "MAJISTRAL", "SENTE",
-    "SARIINTRAKET", "INFATRINI", "VITAL", "SANITAYARA", "OCEAN", "NUXE", "NBTLIFE", "NUTRAXIN",
-    "SOLGAR", "VELAVIT", "BIOXCIN", "CERAVE", "DERMOSKIN", "DINAMIS", "DYNAVIT", "EASYFISH", "MEDICAGO",
-    "MOLLERS", "MUSTELA", "NATURESBOUNTY", "REDEXON", "ROLL", "SENSODYNE", "SIHHAT", "TOPICREM", "TTO", "VICHY"
-    "ZADEVITAL", "WELLCARE", "AYSET",
+    "SARIINTRAKET", "INFATRINI", "VITAL", "SANITAYARA",
 ]
 
 TURKCE_AYLAR = {
@@ -278,8 +275,8 @@ def siparis_hesapla(file_bytes: bytes):
     sonuc["siparis_onceligi"] = sonuc["siparis_durumu"].map({"ACİL": 1, "SİPARİŞ": 2, "GEREK YOK": 3}).fillna(99)
 
     sonuc = sonuc.sort_values(
-        by=["siparis_onceligi", "ham_siparis_miktari", "ortalama_satis"],
-        ascending=[True, False, False]
+        by=["siparis_onceligi", "ortalama_satis"],
+        ascending=[True, False]
     ).reset_index(drop=True)
 
     return sonuc, haric, bugun, toplam_is_gunu, kalan_is_gunu, ay_son_gun
