@@ -339,7 +339,6 @@ def df_to_excel_bytes(sonuc: pd.DataFrame, haric: pd.DataFrame) -> bytes:
                 break
         if durum_col:
             acil_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-            gerek_fill = PatternFill(start_color="EFEFEF", end_color="EFEFEF", fill_type="solid")
             for r in range(2, ws.max_row + 1):
                 durum = ws.cell(row=r, column=durum_col).value
                 fill = acil_fill if durum == "ACİL" else gerek_fill if durum == "GEREK YOK" else None
