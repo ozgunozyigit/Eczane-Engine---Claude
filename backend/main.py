@@ -39,7 +39,7 @@ LISTE_DISI_BASLANGICLAR_RAW = [
     "GRIPIN", "IMUNEKS", "IMUNOL", "NBL", "NIVEA", "NTB", "NOW", "NYXON", "OKEY",
     "PARADONTAX", "REDOXON", "SKINCEUT", "SMARTUP", "SORVAGEN", "STERIMAR", "SUPRADYN",
     "PHARMATON", "TABIA", "TABVITAMIN", "TURKFLEKS", "UMCA", "VEDEXA", "VENATURA",
-    "VERISCA", "WEE",
+    "VERISCA", "WEE", "MAVIINTRAKET"
 ]
 
 TURKCE_AYLAR = {
@@ -209,7 +209,7 @@ def siparis_durumu_belirle(row):
     ortalama_satis = row["ortalama_satis"]
     ham_siparis = row["ham_siparis_miktari"]
     hesap_stok = row["hesap_stok"]
-    if (ortalama_satis > 10 and ham_siparis > 0
+    if (ortalama_satis > 4 and ham_siparis > 0
             and hesap_stok < (ortalama_satis / 30) * 7
             and hesap_stok <= 30):
         return "ACİL"
