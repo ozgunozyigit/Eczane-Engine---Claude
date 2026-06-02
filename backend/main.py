@@ -257,7 +257,7 @@ def siparis_hesapla(file_bytes: bytes):
 
     sonuc["ortalama_satis"] = (sonuc["toplam_3ay_satis"] / 3).round(2)
     sonuc["hesap_stok"] = sonuc["stok"].apply(lambda x: max(x, 0))
-    sonuc["stok_gun"] = row["hesap_stok"] / sonuc["ortalama_gunluk_satis"]
+    sonuc["stok_gun"] = sonuc["hesap_stok"] / sonuc["ortalama_gunluk_satis"]
     sonuc["ortalama_gunluk_satis"] = (sonuc["ortalama_satis"] / 22).round(4)
     sonuc["kalan_ay_ihtiyaci"] = (sonuc["ortalama_gunluk_satis"] * kalan_is_gunu).round(2)
     sonuc["ham_siparis_miktari"] = sonuc.apply(
