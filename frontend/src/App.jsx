@@ -93,6 +93,7 @@ function Table({ rows, search }) {
     { key: "satis_3ay",    label: "3 Ay Satış",        align: "center", w: 95 },
     { key: "ort_aylik",    label: "Ort. Aylık",        align: "center", w: 90 },
     { key: "stok",         label: "Stok",              align: "center", w: 70 },
+    { key: "stok_gun",     label: "Stok (Gün)",        align: "center", w: 50 },
   ];
 
   const filtered = search
