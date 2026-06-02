@@ -258,6 +258,15 @@ def siparis_hesapla(file_bytes: bytes):
     sonuc["ortalama_satis"] = (sonuc["toplam_3ay_satis"] / 3).round(2)
     sonuc["hesap_stok"] = sonuc["stok"].apply(lambda x: max(x, 0))
     sonuc["ortalama_gunluk_satis"] = (sonuc["ortalama_satis"] / 22).round(4)
+
+    # Stok Gün = Hesap Stok / Ortalama Günlük Satış
+    # Ortalama satış yoksa stok gün hesaplanamaz; frontend'de "–" görünmesi için None döner.
+    sonuc["stok_gun"] = sonuc.apply(
+        lambda row: round(row["hesap_stok"] / row["ortalama_gunluk_satis"], 1)
+        if row["ortalama_gunluk_satis"] > 0 else None,
+        axis=1
+    )
+
     sonuc["kalan_ay_ihtiyaci"] = (sonuc["ortalama_gunluk_satis"] * kalan_is_gunu).round(2)
     sonuc["ham_siparis_miktari"] = sonuc.apply(
         lambda row: max(0, math.ceil(row["kalan_ay_ihtiyaci"] - row["hesap_stok"])), axis=1
@@ -414,7 +423,7 @@ def df_to_pdf_bytes(sonuc: pd.DataFrame) -> bytes:
             fmt(row.get("stok", 0)),
         ])
 
-    tbl = Table(table_data, repeatRows=1, colWidths=[8.7*cm, 2.7*cm, 2.7*cm, 2.4*cm, 1.7*cm])
+    tbl = Table(table_data, repeatRows=1, colWidths=[8.9*cm, 2.7*cm, 2.7*cm, 2.4*cm, 1.8*cm])
     tbl.setStyle(TableStyle([
         ("FONTNAME", (0,0), (-1,-1), font_name),
         ("FONTSIZE", (0,0), (-1,-1), 7.2),
@@ -484,7 +493,7 @@ async def hesapla(file: UploadFile = File(...)):
         return v
 
     cols_out = ["gorunen_urun_adi", "planlanan_siparis_miktari", "ham_siparis_miktari",
-                "toplam_3ay_satis", "ortalama_satis", "stok", "siparis_durumu"]
+                "toplam_3ay_satis", "ortalama_satis", "stok", "stok_gun", "siparis_durumu"]
     cols_out = [c for c in cols_out if c in sonuc.columns]
     sonuc_records = sonuc[cols_out].rename(columns={
         "gorunen_urun_adi": "urun_adi",
