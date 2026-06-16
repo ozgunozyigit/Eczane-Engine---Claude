@@ -205,14 +205,35 @@ def sayi_formatla_str(value):
     return str(value)
 
 
+def dusuk_devirli_hedef_stok(toplam_3ay_satis):
+    if 4 <= toplam_3ay_satis <= 8:
+        return 2
+    elif 9 <= toplam_3ay_satis <= 15:
+        return 3
+    elif 16 <= toplam_3ay_satis <= 30:
+        return 4
+    return 0
+
+
 def siparis_durumu_belirle(row):
     ortalama_satis = row["ortalama_satis"]
     ham_siparis = row["ham_siparis_miktari"]
     hesap_stok = row["hesap_stok"]
+    toplam_3ay_satis = row["toplam_3ay_satis"]
+
+    # ACİL kontrolü
     if (ortalama_satis > 4 and ham_siparis > 0
             and hesap_stok < (ortalama_satis / 30) * 7
             and hesap_stok <= 30):
         return "ACİL"
+
+    # DÜŞÜK DEVİRLİ SİPARİŞ kontrolü (acil değilse)
+    if (4 <= toplam_3ay_satis <= 30
+            and hesap_stok <= 1):
+        hedef = dusuk_devirli_hedef_stok(toplam_3ay_satis)
+        if hedef - hesap_stok > 0:
+            return "DÜŞÜK DEVİRLİ SİPARİŞ"
+
     if ham_siparis > 0:
         return "SİPARİŞ"
     return "GEREK YOK"
@@ -283,7 +304,16 @@ def siparis_hesapla(file_bytes: bytes):
         lambda x: min(STOK_CAP, x) if x > 0 else 0
     )
     sonuc["siparis_durumu"] = sonuc.apply(siparis_durumu_belirle, axis=1)
-    sonuc["siparis_onceligi"] = sonuc["siparis_durumu"].map({"ACİL": 1, "SİPARİŞ": 2, "GEREK YOK": 3}).fillna(99)
+
+    # DÜŞÜK DEVİRLİ SİPARİŞ için önerilen miktar = MAX(0, hedef_stok - mevcut_stok)
+    def dusuk_devirli_siparis_miktari(row):
+        if row["siparis_durumu"] == "DÜŞÜK DEVİRLİ SİPARİŞ":
+            hedef = dusuk_devirli_hedef_stok(row["toplam_3ay_satis"])
+            return max(0, hedef - int(row["hesap_stok"]))
+        return row["planlanan_siparis_miktari"]
+
+    sonuc["planlanan_siparis_miktari"] = sonuc.apply(dusuk_devirli_siparis_miktari, axis=1)
+    sonuc["siparis_onceligi"] = sonuc["siparis_durumu"].map({"ACİL": 1, "SİPARİŞ": 2, "DÜŞÜK DEVİRLİ SİPARİŞ": 3, "GEREK YOK": 4}).fillna(99)
 
     sonuc = sonuc.sort_values(
         by=["siparis_onceligi", "ortalama_satis"],
@@ -519,6 +549,7 @@ async def hesapla(file: UploadFile = File(...)):
         "ozet": {
             "acil": int((sonuc["siparis_durumu"] == "ACİL").sum()),
             "siparis": int((sonuc["siparis_durumu"] == "SİPARİŞ").sum()),
+            "dusuk_devirli": int((sonuc["siparis_durumu"] == "DÜŞÜK DEVİRLİ SİPARİŞ").sum()),
             "gerek_yok": int((sonuc["siparis_durumu"] == "GEREK YOK").sum()),
             "liste_disi": len(haric),
             "kalan_is_gunu": kalan_is_gunu,
