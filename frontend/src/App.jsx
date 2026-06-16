@@ -3,9 +3,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const API = "https://eczane-engine-claude.onrender.com";
 
 const STATUS_CONFIG = {
-  "ACİL":      { bg: "#FFF0EC", text: "#C0392B", border: "#E74C3C", badge: "#E74C3C", label: "ACİL" },
-  "SİPARİŞ":   { bg: "#EEF6FF", text: "#1A5DB5", border: "#2980B9", badge: "#2980B9", label: "SİPARİŞ" },
-  "GEREK YOK": { bg: "#F4F4F4", text: "#555",    border: "#CCC",    badge: "#999",    label: "GEREK YOK" },
+  "ACİL":                   { bg: "#FFF0EC", text: "#C0392B", border: "#E74C3C", badge: "#E74C3C", label: "ACİL" },
+  "SİPARİŞ":                { bg: "#EEF6FF", text: "#1A5DB5", border: "#2980B9", badge: "#2980B9", label: "SİPARİŞ" },
+  "DÜŞÜK DEVİRLİ SİPARİŞ": { bg: "#F5F3FF", text: "#6D28D9", border: "#7C3AED", badge: "#7C3AED", label: "D. DEVİRLİ" },
+  "GEREK YOK":              { bg: "#F4F4F4", text: "#555",    border: "#CCC",    badge: "#999",    label: "GEREK YOK" },
 };
 
 function fmt(v) {
@@ -394,10 +395,11 @@ export default function App() {
           <div ref={resultsRef}>
             {/* KPI row */}
             <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
-              <KpiCard label="ACİL"      value={result.ozet.acil}       color="#E74C3C" />
-              <KpiCard label="SİPARİŞ"  value={result.ozet.siparis}    color="#2980B9" />
-              <KpiCard label="GEREK YOK" value={result.ozet.gerek_yok}  color="#94A3B8" />
-              <KpiCard label="LİSTE DIŞI" value={result.ozet.liste_disi} color="#F59E0B" />
+              <KpiCard label="ACİL"           value={result.ozet.acil}          color="#E74C3C" />
+              <KpiCard label="SİPARİŞ"       value={result.ozet.siparis}       color="#2980B9" />
+              <KpiCard label="D. DEVİRLİ"    value={result.ozet.dusuk_devirli} color="#7C3AED" />
+              <KpiCard label="GEREK YOK"     value={result.ozet.gerek_yok}     color="#94A3B8" />
+              <KpiCard label="LİSTE DIŞI"    value={result.ozet.liste_disi}    color="#F59E0B" />
             </div>
 
             {/* Info banner */}
@@ -428,7 +430,8 @@ export default function App() {
             {/* Tabs */}
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "2px solid #E2E8F0" }}>
               {[
-                { key: "siparis", label: `Sipariş Listesi (${result.urunler.length})` },
+                { key: "siparis", label: `Sipariş Listesi (${result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ").length})` },
+                { key: "dusuk", label: `Düşük Devirli (${result.ozet.dusuk_devirli})` },
                 { key: "haric", label: `Liste Dışı (${result.haric_tutulanlar.length})` },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{
@@ -454,8 +457,21 @@ export default function App() {
                     background: "#fff",
                   }}
                 />
-                <Table rows={result.urunler} search={search} />
+                <Table rows={result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ")} search={search} />
               </>
+            )}
+
+            {tab === "dusuk" && (
+              result.ozet.dusuk_devirli === 0
+                ? <div style={{ color: "#94A3B8", textAlign: "center", padding: 32 }}>Düşük devirli sipariş gereken ürün yok.</div>
+                : (
+                  <>
+                    <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 16px", color: "#5B21B6", fontSize: 13, marginBottom: 14, fontWeight: 500 }}>
+                      🟣 Bu ürünler acil değil ancak stok tükenmek üzere. Hedef stok seviyesine göre sipariş önerilmektedir.
+                    </div>
+                    <Table rows={result.urunler.filter(u => u.durum === "DÜŞÜK DEVİRLİ SİPARİŞ")} search="" />
+                  </>
+                )
             )}
 
             {tab === "haric" && (
