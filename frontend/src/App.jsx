@@ -87,6 +87,7 @@ function DropZone({ onFile, loading }) {
 
 function Table({ rows, search }) {
   const cols = [
+    { key: "barkod",       label: "Barkod",            align: "center", w: 118 },
     { key: "urun_adi",     label: "Ürün Adı",         align: "left",   w: "auto" },
     { key: "durum",        label: "Durum",             align: "center", w: 110 },
     { key: "parti_siparis",label: "Parti Sip.",        align: "center", w: 100 },
@@ -136,7 +137,13 @@ function Table({ rows, search }) {
                     fontFamily: c.key === "urun_adi" ? "inherit" : "'DM Mono', monospace",
                     fontSize: c.key === "urun_adi" ? 13 : 12,
                   }}>
-                    {c.key === "durum" ? <Badge durum={row.durum} /> : fmt(row[c.key])}
+                    {c.key === "durum" ? <Badge durum={row.durum} /> :
+                     c.key === "barkod" ? (
+                       row.barkod
+                         ? <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#374151", letterSpacing: "0.03em" }}>{row.barkod}</span>
+                         : <span style={{ color: "#CBD5E1", fontSize: 11 }}>—</span>
+                     ) :
+                     fmt(row[c.key])}
                   </td>
                 ))}
               </tr>
@@ -266,6 +273,10 @@ export default function App() {
           <div style={{ marginLeft: "auto", textAlign: "right", fontSize: 12, color: "#94A3B8", lineHeight: 1.8 }}>
             <div>📅 {info.bugun_str}</div>
             <div>⏳ {info.aktif_ay} ayı kalan iş günü: <strong style={{ color: "#38BDF8" }}>{info.kalan_is_gunu}</strong></div>
+            {info.barkod_aktif
+              ? <div>🔖 Barkod: <strong style={{ color: "#34D399" }}>{info.barkod_kayit_sayisi?.toLocaleString("tr-TR")} ürün</strong></div>
+              : <div style={{ color: "#64748B" }}>🔖 Barkod listesi yüklü değil</div>
+            }
           </div>
         )}
       </header>
