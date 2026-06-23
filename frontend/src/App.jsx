@@ -12,7 +12,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "1061786067280",
   appId: "1:1061786067280:web:e40672a53053bb4eea8c55"
 };
-const ECZANE_KODU = "ECZANE01"; // Eczane kodunuzu buraya yazın
+const ECZANE_KODU = "ÖZGÜN"; // Eczane kodunuzu buraya yazın
 
 const STATUS_CONFIG = {
   "ACİL":                   { bg: "#FFF0EC", text: "#C0392B", border: "#E74C3C", badge: "#E74C3C", label: "ACİL" },
