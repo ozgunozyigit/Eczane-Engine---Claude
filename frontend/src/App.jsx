@@ -1,6 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 
 const API = "https://eczane-engine-claude.onrender.com";
+
+// Firebase yapılandırması — eksik-listesi projesiyle aynı
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAQXbjWiXAy8roTqrIGfrHQUZLp-eNMV28",
+  authDomain: "eksik-listesi-537ae.firebaseapp.com",
+  projectId: "eksik-listesi-537ae",
+  storageBucket: "eksik-listesi-537ae.firebasestorage.app",
+  messagingSenderId: "1061786067280",
+  appId: "1:1061786067280:web:e40672a53053bb4eea8c55"
+};
+const ECZANE_KODU = "ECZANE01"; // Eczane kodunuzu buraya yazın
 
 const STATUS_CONFIG = {
   "ACİL":                   { bg: "#FFF0EC", text: "#C0392B", border: "#E74C3C", badge: "#E74C3C", label: "ACİL" },
@@ -26,6 +38,60 @@ function Badge({ durum }) {
       fontSize: 11, fontWeight: 700, letterSpacing: "0.05em",
       whiteSpace: "nowrap"
     }}>{cfg.label}</span>
+  );
+}
+
+// Eksik listesi rozeti ve popup
+function EksikRozet({ eksikBilgi }) {
+  const [popup, setPopup] = useState(false);
+  if (!eksikBilgi) return null;
+
+  const tarih = eksikBilgi.sonGirisTarihi?.toDate?.()?.toLocaleString("tr-TR", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+  }) || "—";
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <span
+        onClick={() => setPopup(!popup)}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "2px 8px",
+          background: "#fef3c7", color: "#92400e",
+          border: "1px solid #fcd34d", borderRadius: 12,
+          fontSize: 11, fontWeight: 700, cursor: "pointer",
+          whiteSpace: "nowrap", userSelect: "none"
+        }}
+        title="Eksik listesinde — detay için tıkla"
+      >
+        ⚠ EKSİK
+      </span>
+
+      {popup && (
+        <>
+          <div onClick={() => setPopup(false)} style={{
+            position: "fixed", inset: 0, zIndex: 998
+          }} />
+          <div style={{
+            position: "absolute", top: "calc(100% + 6px)", left: 0,
+            background: "#fff", border: "1.5px solid #fcd34d",
+            borderRadius: 10, padding: "12px 16px", zIndex: 999,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+            minWidth: 220, maxWidth: 280
+          }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e", marginBottom: 8 }}>
+              ⚠ Eksik Listesinde
+            </div>
+            <div style={{ fontSize: 12, color: "#374151", marginBottom: 4 }}>
+              <strong>Ekleyen:</strong> {(eksikBilgi.kullanicilar || []).join(", ")}
+            </div>
+            <div style={{ fontSize: 12, color: "#374151" }}>
+              <strong>Son giriş:</strong> {tarih}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -62,19 +128,14 @@ function DropZone({ onFile, loading }) {
       onClick={() => !loading && inputRef.current.click()}
       style={{
         border: `2px dashed ${dragging ? "#2563EB" : "#CBD5E1"}`,
-        borderRadius: 14,
-        padding: "40px 24px",
-        textAlign: "center",
-        cursor: loading ? "not-allowed" : "pointer",
+        borderRadius: 14, padding: "40px 24px",
+        textAlign: "center", cursor: loading ? "not-allowed" : "pointer",
         background: dragging ? "#EFF6FF" : "#FAFBFC",
-        transition: "all 0.2s",
-        opacity: loading ? 0.6 : 1,
+        transition: "all 0.2s", opacity: loading ? 0.6 : 1,
       }}
     >
       <input
-        ref={inputRef}
-        type="file"
-        accept=".xls,.xlsx"
+        ref={inputRef} type="file" accept=".xls,.xlsx"
         style={{ display: "none" }}
         onChange={(e) => { if (e.target.files[0]) onFile(e.target.files[0]); }}
       />
@@ -85,17 +146,18 @@ function DropZone({ onFile, loading }) {
   );
 }
 
-function Table({ rows, search }) {
+function Table({ rows, search, eksikMap }) {
   const cols = [
-    { key: "barkod",       label: "Barkod",            align: "center", w: 118 },
-    { key: "urun_adi",     label: "Ürün Adı",         align: "left",   w: "auto" },
-    { key: "durum",        label: "Durum",             align: "center", w: 110 },
-    { key: "parti_siparis",label: "Parti Sip.",        align: "center", w: 100 },
-    { key: "toplam_siparis",label:"Top. Sip.",         align: "center", w: 100 },
-    { key: "satis_3ay",    label: "3 Ay Satış",        align: "center", w: 95 },
-    { key: "ort_aylik",    label: "Ort. Aylık",        align: "center", w: 90 },
-    { key: "stok",         label: "Stok",              align: "center", w: 70 },
-    { key: "stok_gun",     label: "Stok Gün",          align: "center", w: 80 },
+    { key: "barkod",        label: "Barkod",       align: "center", w: 118 },
+    { key: "urun_adi",      label: "Ürün Adı",     align: "left",   w: "auto" },
+    { key: "eksik",         label: "Eksik",        align: "center", w: 90 },
+    { key: "durum",         label: "Durum",        align: "center", w: 110 },
+    { key: "parti_siparis", label: "Parti Sip.",   align: "center", w: 100 },
+    { key: "toplam_siparis",label: "Top. Sip.",    align: "center", w: 100 },
+    { key: "satis_3ay",     label: "3 Ay Satış",   align: "center", w: 95 },
+    { key: "ort_aylik",     label: "Ort. Aylık",   align: "center", w: 90 },
+    { key: "stok",          label: "Stok",         align: "center", w: 70 },
+    { key: "stok_gun",      label: "Stok Gün",     align: "center", w: 80 },
   ];
 
   const filtered = search
@@ -109,7 +171,7 @@ function Table({ rows, search }) {
           <tr style={{ background: "#1E293B" }}>
             {cols.map(c => (
               <th key={c.key} style={{
-                padding: "10px 12px", color: "#E2E8F0",
+                padding: "10px 12px", color: c.key === "eksik" ? "#fcd34d" : "#E2E8F0",
                 fontWeight: 700, fontSize: 11, letterSpacing: "0.07em",
                 textTransform: "uppercase", textAlign: c.align,
                 width: c.w !== "auto" ? c.w : undefined,
@@ -123,11 +185,13 @@ function Table({ rows, search }) {
           )}
           {filtered.map((row, i) => {
             const cfg = STATUS_CONFIG[row.durum] || {};
+            const eksikBilgi = eksikMap[row.barkod] || null;
             return (
               <tr key={i} style={{
-                background: i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA"),
+                background: eksikBilgi
+                  ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
+                  : (i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA")),
                 borderBottom: "1px solid #E2E8F0",
-                transition: "background 0.1s",
               }}>
                 {cols.map(c => (
                   <td key={c.key} style={{
@@ -138,6 +202,7 @@ function Table({ rows, search }) {
                     fontSize: c.key === "urun_adi" ? 13 : 12,
                   }}>
                     {c.key === "durum" ? <Badge durum={row.durum} /> :
+                     c.key === "eksik" ? <EksikRozet eksikBilgi={eksikBilgi} /> :
                      c.key === "barkod" ? (row.barkod ?? "—") :
                      fmt(row[c.key])}
                   </td>
@@ -151,6 +216,33 @@ function Table({ rows, search }) {
   );
 }
 
+// Firebase'den eksik listesini çek
+async function eksikListesiniCek() {
+  try {
+    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const { getFirestore, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+
+    const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+    const db = getFirestore(app);
+
+    const q = query(
+      collection(db, `eczaneler/${ECZANE_KODU}/eksikler`),
+      where("durum", "==", "aktif")
+    );
+
+    const snapshot = await getDocs(q);
+    const map = {};
+    snapshot.forEach(doc => {
+      const v = doc.data();
+      map[v.barkod] = v;
+    });
+    return map;
+  } catch (e) {
+    console.warn("Eksik listesi çekilemedi:", e.message);
+    return {};
+  }
+}
+
 export default function App() {
   const [info, setInfo] = useState(null);
   const [file, setFile] = useState(null);
@@ -158,8 +250,9 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState("siparis"); // "siparis" | "haric" | "debug"
+  const [tab, setTab] = useState("siparis");
   const [dlLoading, setDlLoading] = useState({ excel: false, pdf: false });
+  const [eksikMap, setEksikMap] = useState({});
   const resultsRef = useRef();
 
   useEffect(() => {
@@ -167,17 +260,19 @@ export default function App() {
       .then(r => r.json())
       .then(setInfo)
       .catch(() => setInfo(null));
+
+    // Eksik listesini yükle ve 60sn'de bir güncelle
+    eksikListesiniCek().then(setEksikMap);
+    const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleFile = useCallback((f) => {
-    setResult(null);
-    setError(null);
-    const allowedExt = [".xls", ".xlsx"];
+    setResult(null); setError(null);
     const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
-    if (!allowedExt.includes(ext)) {
-      setError(`❌ Geçersiz dosya formatı: "${f.name}"\n\nSadece Excel dosyası (.xls veya .xlsx) yüklenebilir. Eczanem'den raporu Excel formatında indirdiğinizden emin olun.`);
-      setFile(null);
-      return;
+    if (![".xls", ".xlsx"].includes(ext)) {
+      setError(`❌ Geçersiz dosya formatı: "${f.name}"\n\nSadece Excel dosyası yüklenebilir.`);
+      setFile(null); return;
     }
     setFile(f);
   }, []);
@@ -186,8 +281,8 @@ export default function App() {
     if (!msg) return "Bilinmeyen bir hata oluştu.";
     if (msg.includes("Dosya okunamadı") || msg.includes("Excel"))
       return "❌ Dosya okunamadı.\n\nLütfen şunları kontrol edin:\n• Eczanem → Raporlar → Ürün Bazında Toplamlar raporunu seçtiniz mi?\n• Dosya Excel formatında (.xls / .xlsx) mı kaydedildi?\n• Dosya başka bir program tarafından açık değil mi?";
-    if (msg.includes("sütun") || msg.includes("column") || msg.includes("A,B,F"))
-      return "❌ Dosya yapısı uyumsuz.\n\nBu rapor 'Ürün Bazında Toplamlar' formatında değil. A sütunu Ürün Adı, B sütunu 3 aylık satış, F sütunu Stok Miktarı olmalıdır.";
+    if (msg.includes("sütun") || msg.includes("column"))
+      return "❌ Dosya yapısı uyumsuz.\n\nBu rapor 'Ürün Bazında Toplamlar' formatında değil.";
     if (msg.includes("tarih") || msg.includes("3 ay"))
       return "❌ Tarih aralığı hatalı.\n\nLütfen son 3 tamamlanmış ayı seçin." + (info ? ` Doğru aralık: ${info.rapor_araligi_str}` : "");
     return `❌ Hata: ${msg}`;
@@ -195,9 +290,7 @@ export default function App() {
 
   const handleHesapla = async () => {
     if (!file) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
+    setLoading(true); setError(null); setResult(null);
     const fd = new FormData();
     fd.append("file", file);
     try {
@@ -205,6 +298,8 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Bilinmeyen hata");
       setResult(data);
+      // Sonuçlarla birlikte eksik listesini de güncelle
+      eksikListesiniCek().then(setEksikMap);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (e) {
       setError(formatError(e.message));
@@ -219,9 +314,7 @@ export default function App() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await fetch(`${API}/api/${type === "excel" ? "excel-indir" : "pdf-indir"}`, {
-        method: "POST", body: fd
-      });
+      const res = await fetch(`${API}/api/${type === "excel" ? "excel-indir" : "pdf-indir"}`, { method: "POST", body: fd });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -236,13 +329,10 @@ export default function App() {
     }
   };
 
+  const eksikSayisi = Object.keys(eksikMap).length;
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#F1F5F9",
-      fontFamily: "'Sora', sans-serif",
-    }}>
-      {/* Google Fonts */}
+    <div style={{ minHeight: "100vh", background: "#F1F5F9", fontFamily: "'Sora', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; }
@@ -250,14 +340,9 @@ export default function App() {
         button:hover { opacity: 0.88; }
       `}</style>
 
-      {/* Header */}
       <header style={{
-        background: "#0F172A",
-        color: "#fff",
-        padding: "18px 32px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
+        background: "#0F172A", color: "#fff",
+        padding: "18px 32px", display: "flex", alignItems: "center", gap: 16,
         boxShadow: "0 2px 16px rgba(0,0,0,0.18)",
       }}>
         <span style={{ fontSize: 26 }}>💊</span>
@@ -265,27 +350,33 @@ export default function App() {
           <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: "-0.01em" }}>Eczane Sipariş ENGINe</div>
           <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>Düşük Stok Sipariş Listesi</div>
         </div>
-        {info && (
-          <div style={{ marginLeft: "auto", textAlign: "right", fontSize: 12, color: "#94A3B8", lineHeight: 1.8 }}>
-            <div>📅 {info.bugun_str}</div>
-            <div>⏳ {info.aktif_ay} ayı kalan iş günü: <strong style={{ color: "#38BDF8" }}>{info.kalan_is_gunu}</strong></div>
-            {info.barkod_aktif
-              ? <div>🔖 Barkod: <strong style={{ color: "#34D399" }}>{info.barkod_kayit_sayisi?.toLocaleString("tr-TR")} ürün</strong></div>
-              : <div style={{ color: "#64748B" }}>🔖 Barkod listesi yüklü değil</div>
-            }
-          </div>
-        )}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
+          {eksikSayisi > 0 && (
+            <div style={{
+              background: "#fef3c7", color: "#92400e",
+              border: "1px solid #fcd34d", borderRadius: 8,
+              padding: "6px 14px", fontSize: 13, fontWeight: 700
+            }}>
+              ⚠ {eksikSayisi} eksik ürün
+            </div>
+          )}
+          {info && (
+            <div style={{ textAlign: "right", fontSize: 12, color: "#94A3B8", lineHeight: 1.8 }}>
+              <div>📅 {info.bugun_str}</div>
+              <div>⏳ {info.aktif_ay} ayı kalan iş günü: <strong style={{ color: "#38BDF8" }}>{info.kalan_is_gunu}</strong></div>
+              {info.barkod_aktif
+                ? <div>🔖 Barkod: <strong style={{ color: "#34D399" }}>{info.barkod_kayit_sayisi?.toLocaleString("tr-TR")} ürün</strong></div>
+                : <div style={{ color: "#64748B" }}>🔖 Barkod listesi yüklü değil</div>
+              }
+            </div>
+          )}
+        </div>
       </header>
 
       <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px" }}>
 
-        {/* Info + Upload Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-
-          {/* Info + Guide card */}
           <div style={{ background: "#fff", borderRadius: 14, padding: 24, boxShadow: "0 2px 10px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column", gap: 16 }}>
-
-            {/* Tarih bilgisi */}
             <div>
               <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 10 }}>📌 Satış Raporu Bilgileri</div>
               {info ? (
@@ -313,8 +404,6 @@ export default function App() {
                 <div style={{ color: "#94A3B8", fontSize: 13 }}>Bağlanılıyor...</div>
               )}
             </div>
-
-            {/* Adım adım kılavuz */}
             <div>
               <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 10 }}>📋 Nasıl Kullanılır?</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -327,34 +416,17 @@ export default function App() {
                   { n: 6, text: "Sağdaki alana yükleyin ve butona tıklayın" },
                 ].map(s => (
                   <div key={s.n} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#374151" }}>
-                    <span style={{
-                      minWidth: 22, height: 22, borderRadius: "50%",
-                      background: "#2563EB", color: "#fff",
-                      fontSize: 11, fontWeight: 800,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      marginTop: 1, flexShrink: 0,
-                    }}>{s.n}</span>
+                    <span style={{ minWidth: 22, height: 22, borderRadius: "50%", background: "#2563EB", color: "#fff", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, flexShrink: 0 }}>{s.n}</span>
                     <span style={{ lineHeight: 1.6 }}>{s.text}</span>
                   </div>
                 ))}
               </div>
             </div>
-
           </div>
 
-          {/* Upload card */}
           <div style={{ background: "#fff", borderRadius: 14, padding: 24, boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
             <div style={{ fontWeight: 800, fontSize: 15, color: "#0F172A", marginBottom: 14 }}>📂 Dosya Yükle</div>
-            <div style={{
-              background: "#FFF7ED",
-              border: "1px solid #FED7AA",
-              borderRadius: 8,
-              padding: "12px 14px",
-              marginBottom: 14,
-              fontSize: 13,
-              color: "#92400E",
-              lineHeight: 1.8,
-            }}>
+            <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: "#92400E", lineHeight: 1.8 }}>
               <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Dosyayı yüklemeden önce kontrol edin:</div>
               <div>📅 <strong>Tarih aralığı:</strong> Son 3 tamamlanmış ay — örneğin <strong>{info ? info.rapor_araligi_str : "..."}</strong></div>
               <div>📊 <strong>Rapor türü:</strong> Eczanem → Raporlar → <strong>Ürün Bazında Toplamlar</strong></div>
@@ -372,19 +444,11 @@ export default function App() {
               onClick={handleHesapla}
               disabled={!file || loading}
               style={{
-                marginTop: 14,
-                width: "100%",
-                padding: "12px 0",
+                marginTop: 14, width: "100%", padding: "12px 0",
                 background: (!file || loading) ? "#CBD5E1" : "#2563EB",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: (!file || loading) ? "not-allowed" : "pointer",
-                fontFamily: "inherit",
-                letterSpacing: "0.02em",
-                transition: "background 0.2s",
+                color: "#fff", border: "none", borderRadius: 8,
+                fontWeight: 700, fontSize: 14, cursor: (!file || loading) ? "not-allowed" : "pointer",
+                fontFamily: "inherit", letterSpacing: "0.02em", transition: "background 0.2s",
               }}
             >
               {loading ? "⏳ Hesaplanıyor..." : "🚀 Sipariş Listesini Oluştur"}
@@ -397,49 +461,37 @@ export default function App() {
           </div>
         </div>
 
-        {/* Results */}
         {result && (
           <div ref={resultsRef}>
-            {/* KPI row */}
             <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
-              <KpiCard label="ACİL"           value={result.ozet.acil}          color="#E74C3C" />
-              <KpiCard label="SİPARİŞ"       value={result.ozet.siparis}       color="#2980B9" />
-              <KpiCard label="D. DEVİRLİ"    value={result.ozet.dusuk_devirli} color="#7C3AED" />
-              <KpiCard label="GEREK YOK"     value={result.ozet.gerek_yok}     color="#94A3B8" />
-              <KpiCard label="LİSTE DIŞI"    value={result.ozet.liste_disi}    color="#F59E0B" />
+              <KpiCard label="ACİL"        value={result.ozet.acil}          color="#E74C3C" />
+              <KpiCard label="SİPARİŞ"    value={result.ozet.siparis}       color="#2980B9" />
+              <KpiCard label="D. DEVİRLİ" value={result.ozet.dusuk_devirli} color="#7C3AED" />
+              <KpiCard label="GEREK YOK"  value={result.ozet.gerek_yok}     color="#94A3B8" />
+              <KpiCard label="LİSTE DIŞI" value={result.ozet.liste_disi}    color="#F59E0B" />
+              {eksikSayisi > 0 && <KpiCard label="EKSİK LİSTESİ" value={eksikSayisi} color="#D97706" />}
             </div>
 
-            {/* Info banner */}
-            <div style={{
-              background: "#EFF6FF", border: "1px solid #BFDBFE",
-              borderRadius: 10, padding: "12px 16px",
-              color: "#1E40AF", fontSize: 13, marginBottom: 12, fontWeight: 500,
-            }}>
+            <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px", color: "#1E40AF", fontSize: 13, marginBottom: 12, fontWeight: 500 }}>
               ⏳ Sipariş önerileri, ay sonuna kadar kalan <strong>{result.ozet.kalan_is_gunu} resmi iş günü</strong> ihtiyacına göre hesaplanmıştır.
             </div>
 
             {result.ozet.yaz_ayi_indirimi && (
-              <div style={{
-                background: "#FFF7ED", border: "1px solid #FED7AA",
-                borderRadius: 10, padding: "12px 16px",
-                color: "#92400E", fontSize: 13, marginBottom: 12, fontWeight: 500,
-              }}>
-                ☀️ <strong>Yaz ayı modu aktif:</strong> Haziran-Temmuz-Ağustos döneminde satışlar azaldığından toplam sipariş miktarlarına <strong>%20 indirim</strong> uygulanmıştır.
+              <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 10, padding: "12px 16px", color: "#92400E", fontSize: 13, marginBottom: 12, fontWeight: 500 }}>
+                ☀️ <strong>Yaz ayı modu aktif:</strong> Toplam sipariş miktarlarına <strong>%20 indirim</strong> uygulanmıştır.
               </div>
             )}
 
-            {/* Download buttons */}
             <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
               <DlButton onClick={() => handleDownload("excel")} loading={dlLoading.excel} color="#16A34A" icon="📥" label="Excel İndir" />
               <DlButton onClick={() => handleDownload("pdf")} loading={dlLoading.pdf} color="#DC2626" icon="📄" label="Acil Sipariş PDF" />
             </div>
 
-            {/* Tabs */}
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "2px solid #E2E8F0" }}>
               {[
                 { key: "siparis", label: `Sipariş Listesi (${result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ").length})` },
-                { key: "dusuk", label: `Düşük Devirli (${result.ozet.dusuk_devirli})` },
-                { key: "haric", label: `Liste Dışı (${result.haric_tutulanlar.length})` },
+                { key: "dusuk",   label: `Düşük Devirli (${result.ozet.dusuk_devirli})` },
+                { key: "haric",   label: `Liste Dışı (${result.haric_tutulanlar.length})` },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{
                   padding: "8px 18px", border: "none", background: "none", cursor: "pointer",
@@ -454,17 +506,11 @@ export default function App() {
             {tab === "siparis" && (
               <>
                 <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="🔍 Ürün adı ara..."
-                  style={{
-                    width: "100%", padding: "10px 14px", fontSize: 14,
-                    border: "1.5px solid #CBD5E1", borderRadius: 8,
-                    outline: "none", marginBottom: 14, fontFamily: "inherit",
-                    background: "#fff",
-                  }}
+                  style={{ width: "100%", padding: "10px 14px", fontSize: 14, border: "1.5px solid #CBD5E1", borderRadius: 8, outline: "none", marginBottom: 14, fontFamily: "inherit", background: "#fff" }}
                 />
-                <Table rows={result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ")} search={search} />
+                <Table rows={result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ")} search={search} eksikMap={eksikMap} />
               </>
             )}
 
@@ -474,9 +520,9 @@ export default function App() {
                 : (
                   <>
                     <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 16px", color: "#5B21B6", fontSize: 13, marginBottom: 14, fontWeight: 500 }}>
-                      🟣 Bu ürünler acil değil ancak stok tükenmek üzere. Hedef stok seviyesine göre sipariş önerilmektedir.
+                      🟣 Bu ürünler acil değil ancak stok tükenmek üzere.
                     </div>
-                    <Table rows={result.urunler.filter(u => u.durum === "DÜŞÜK DEVİRLİ SİPARİŞ")} search="" />
+                    <Table rows={result.urunler.filter(u => u.durum === "DÜŞÜK DEVİRLİ SİPARİŞ")} search="" eksikMap={eksikMap} />
                   </>
                 )
             )}
@@ -526,10 +572,7 @@ function InfoRow({ label, value, highlight, accent }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F1F5F9" }}>
       <span style={{ fontSize: 12, color: "#64748B" }}>{label}</span>
-      <span style={{
-        fontSize: 13, fontWeight: 700,
-        color: accent ? "#16A34A" : highlight ? "#2563EB" : "#0F172A",
-      }}>{value}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: accent ? "#16A34A" : highlight ? "#2563EB" : "#0F172A" }}>{value}</span>
     </div>
   );
 }
