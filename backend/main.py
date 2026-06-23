@@ -10,9 +10,22 @@ import pandas as pd
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process as fuzz_process
 
-app = FastAPI(title="Eczane Sipariş ENGINe API", version="1.0.0")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app):
+    """Uygulama başlarken barkod listesini yükle."""
+    barkod_dosyasi = os.path.join(os.path.dirname(__file__), _BARKOD_DOSYA_ADI)
+    if os.path.exists(barkod_dosyasi):
+        n = _barkod_lookup.yukle(barkod_dosyasi)
+        print(f"[BarkodLookup] {n} ürün yüklendi.")
+    else:
+        print(f"[BarkodLookup] {barkod_dosyasi} bulunamadı — barkod özelliği pasif.")
+    yield
+
+app = FastAPI(title="Eczane Sipariş ENGINe API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,6 +60,101 @@ TURKCE_AYLAR = {
     5: "Mayıs", 6: "Haziran", 7: "Temmuz", 8: "Ağustos",
     9: "Eylül", 10: "Ekim", 11: "Kasım", 12: "Aralık",
 }
+
+# =========================================================
+# BARKOD LİSTESİ — startup'ta belleğe yüklenir
+# =========================================================
+
+# Listede kısa birim kısaltmaları kullanılıyor (TB, KAPS vb.)
+# Eczanem ürün adlarında uzun hali var (TABLET, KAPSUL vb.)
+# exact2 eşleşmesi için her iki tarafı da kısaltıyoruz.
+_TABLET_KISALT = {
+    "FILMTABIET": "TB", "FILMTABLET": "TB",
+    "KONTROLLUSALIMLITABLET": "KONTSALFTB", "KONTROLLUSALIMLITB": "KONTSALFTB",
+    "YAVASSALIMLITABLET": "YAVASSALFTB", "YAVASSALIMLITB": "YAVASSALFTB",
+    "KONTSALIMLITABLET": "KONTSALFTB", "KONTSALIMLITB": "KONTSALFTB",
+    "SALIMLITABLET": "SALFTB", "SALIMLITB": "SALFTB",
+    "TABIET": "TB", "TABLET": "TB",
+    "KAPSUL": "KAPS", "KAPSEL": "KAPS",
+}
+
+def _normalize2(norm_key: str) -> str:
+    """norm_key üzerinde ek birim kısaltmaları uygular (TB/KAPS vb.)"""
+    k = norm_key
+    for uzun in sorted(_TABLET_KISALT, key=len, reverse=True):
+        k = k.replace(uzun, _TABLET_KISALT[uzun])
+    return k
+
+
+class BarkodLookup:
+    """
+    Eczanem normalize_key → SGK barkodu eşleştirici.
+
+    Arama önceliği:
+      1. Tam eşleşme (normalize_key)
+      2. Birim kısaltma sonrası tam eşleşme (_normalize2)
+      3. İlk 6 karakter ile aday eleme + ratio >= 80 fuzzy eşleşme
+    """
+
+    def __init__(self):
+        self._dict: dict[str, str] = {}   # norm_ad -> barkod
+        self._dict2: dict[str, str] = {}  # norm2_ad -> barkod  (hızlı exact2)
+        self._keys: list[str] = []
+        self._keys2: list[str] = []
+        self.loaded = False
+
+    def yukle(self, dosya_yolu: str) -> int:
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(dosya_yolu, read_only=True)
+            ws = wb.active
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not row or len(row) < 2:
+                    continue
+                barkod, ilac_adi = row[0], row[1]
+                if not ilac_adi or not barkod:
+                    continue
+                norm = normalize_urun_adi(str(ilac_adi))
+                if not norm:
+                    continue
+                b = str(int(barkod)) if isinstance(barkod, float) else str(barkod)
+                self._dict[norm] = b
+                self._dict2[_normalize2(norm)] = b
+            self._keys = list(self._dict.keys())
+            self._keys2 = list(self._dict2.keys())
+            self.loaded = True
+            return len(self._dict)
+        except Exception as e:
+            print(f"[BarkodLookup] Yükleme hatası: {e}")
+            return 0
+
+    def bul(self, normalize_key: str) -> str | None:
+        if not self.loaded:
+            return None
+        # 1. Tam eşleşme
+        b = self._dict.get(normalize_key)
+        if b:
+            return b
+        # 2. Birim kısaltma sonrası tam eşleşme
+        b = self._dict2.get(_normalize2(normalize_key))
+        if b:
+            return b
+        # 3. Prefix eleme + fuzzy
+        prefix = normalize_key[:6]
+        candidates = [k for k in self._keys if k[:6] == prefix]
+        if not candidates:
+            return None
+        n2 = _normalize2(normalize_key)
+        cand2 = [_normalize2(c) for c in candidates]
+        result = fuzz_process.extractOne(n2, cand2, scorer=fuzz.ratio, score_cutoff=80)
+        if result:
+            idx = cand2.index(result[0])
+            return self._dict[candidates[idx]]
+        return None
+
+
+_barkod_lookup = BarkodLookup()
+_BARKOD_DOSYA_ADI = "barkod_listesi.xlsx"
 
 
 def bugun_turkiye():
@@ -315,10 +423,22 @@ def siparis_hesapla(file_bytes: bytes):
     sonuc["planlanan_siparis_miktari"] = sonuc.apply(dusuk_devirli_siparis_miktari, axis=1)
     sonuc["siparis_onceligi"] = sonuc["siparis_durumu"].map({"ACİL": 1, "SİPARİŞ": 2, "DÜŞÜK DEVİRLİ SİPARİŞ": 3, "GEREK YOK": 4}).fillna(99)
 
-    sonuc = sonuc.sort_values(
-        by=["siparis_onceligi", "ortalama_satis"],
-        ascending=[True, False]
-    ).reset_index(drop=True)
+    # Barkod eşleştirmesi — normalize_key üzerinden
+    if _barkod_lookup.loaded:
+        sonuc["barkod"] = sonuc["normalize_ad"].apply(_barkod_lookup.bul)
+        # Barkod sıralaması: öncelik > barkod (sayısal) > ortalama satış
+        sonuc["_barkod_sort"] = pd.to_numeric(sonuc["barkod"], errors="coerce")
+        sonuc = sonuc.sort_values(
+            by=["siparis_onceligi", "_barkod_sort", "ortalama_satis"],
+            ascending=[True, True, False],
+            na_position="last"
+        ).drop(columns=["_barkod_sort"]).reset_index(drop=True)
+    else:
+        sonuc["barkod"] = None
+        sonuc = sonuc.sort_values(
+            by=["siparis_onceligi", "ortalama_satis"],
+            ascending=[True, False]
+        ).reset_index(drop=True)
 
     return sonuc, haric, bugun, toplam_is_gunu, kalan_is_gunu, ay_son_gun
 
@@ -378,6 +498,7 @@ def df_to_excel_bytes(sonuc: pd.DataFrame, haric: pd.DataFrame) -> bytes:
                 break
         if durum_col:
             acil_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+            gerek_fill = PatternFill(start_color="F4F4F4", end_color="F4F4F4", fill_type="solid")
             for r in range(2, ws.max_row + 1):
                 durum = ws.cell(row=r, column=durum_col).value
                 fill = acil_fill if durum == "ACİL" else gerek_fill if durum == "GEREK YOK" else None
@@ -498,6 +619,8 @@ def get_info():
         "rapor_baslangic": rapor_baslangic.isoformat(),
         "rapor_bitis": rapor_bitis.isoformat(),
         "rapor_araligi_str": f"{turkce_tarih_yaz(rapor_baslangic)} - {turkce_tarih_yaz(rapor_bitis)}",
+        "barkod_aktif": _barkod_lookup.loaded,
+        "barkod_kayit_sayisi": len(_barkod_lookup._dict),
     }
 
 
@@ -523,7 +646,7 @@ async def hesapla(file: UploadFile = File(...)):
         return v
 
     cols_out = ["gorunen_urun_adi", "planlanan_siparis_miktari", "ham_siparis_miktari",
-                "toplam_3ay_satis", "ortalama_satis", "stok", "stok_gun", "siparis_durumu"]
+                "toplam_3ay_satis", "ortalama_satis", "stok", "stok_gun", "siparis_durumu", "barkod"]
     cols_out = [c for c in cols_out if c in sonuc.columns]
     sonuc_records = sonuc[cols_out].rename(columns={
         "gorunen_urun_adi": "urun_adi",
