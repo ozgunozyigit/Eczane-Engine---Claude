@@ -138,11 +138,7 @@ function Table({ rows, search }) {
                     fontSize: c.key === "urun_adi" ? 13 : 12,
                   }}>
                     {c.key === "durum" ? <Badge durum={row.durum} /> :
-                     c.key === "barkod" ? (
-                       row.barkod
-                         ? <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#374151", letterSpacing: "0.03em" }}>{row.barkod}</span>
-                         : <span style={{ color: "#CBD5E1", fontSize: 11 }}>—</span>
-                     ) :
+                     c.key === "barkod" ? (row.barkod ?? "—") :
                      fmt(row[c.key])}
                   </td>
                 ))}
