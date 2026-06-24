@@ -359,7 +359,7 @@ function Table({ rows, search, eksikMap }) {
                 textTransform: "uppercase", textAlign: c.align,
                 width: c.w !== "auto" ? c.w : undefined,
               }}>
-c.label
+                {c.label}
               </th>
             ))}
           </tr>
