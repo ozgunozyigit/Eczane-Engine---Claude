@@ -111,7 +111,7 @@ function DropZone({ onFile, loading }) {
   );
 }
 
-function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
+function GekAktarButon({ rows, eksikMap }) {
   const [gonderildi, setGonderildi] = useState(false);
   const [gekListesiVar, setGekListesiVar] = useState(false);
   const [mesaj, setMesaj] = useState("");
@@ -126,37 +126,53 @@ function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
   };
 
   const handleAktar = () => {
-    const secilenSatirlar = rows.filter(r => secilen.has(r.barkod) && r.parti_siparis > 0);
-    if (secilenSatirlar.length === 0) return;
-    const liste = secilenSatirlar.map(r => ({
-      barkod: r.barkod,
-      urunAdi: r.urun_adi,
-      miktar: Math.round(r.parti_siparis),
-      tamamlandi: false
-    }));
+    const eksikBarkodlar = Object.keys(eksikMap);
+    if (eksikBarkodlar.length === 0) {
+      toastGoster("Eksik listesi boş");
+      return;
+    }
+
+    // Eksik listedeki barkodları sipariş tablosunda eşleştir
+    const eksikSet = new Set(eksikBarkodlar);
+    const liste = [];
+
+    for (const r of rows) {
+      if (!eksikSet.has(r.barkod)) continue;
+      liste.push({
+        barkod: r.barkod,
+        urunAdi: r.urun_adi,
+        miktar: r.parti_siparis > 0 ? Math.round(r.parti_siparis) : 1,
+        tamamlandi: false
+      });
+    }
+
+    // Sipariş tablosunda olmayan eksik ürünleri de ekle (parti_siparis=1 ile)
+    const siparisBarkodar = new Set(rows.map(r => r.barkod));
+    for (const barkod of eksikBarkodlar) {
+      if (!siparisBarkodar.has(barkod)) {
+        const eksikBilgi = eksikMap[barkod];
+        liste.push({
+          barkod,
+          urunAdi: eksikBilgi.urunAdi || barkod,
+          miktar: 1,
+          tamamlandi: false
+        });
+      }
+    }
+
+    if (liste.length === 0) {
+      toastGoster("Aktarılacak ürün bulunamadı");
+      return;
+    }
+
     localStorage.setItem(GEK_STORAGE_KEY, JSON.stringify(liste));
     setGonderildi(true);
     setGekListesiVar(true);
     setTimeout(() => setGonderildi(false), 3000);
-    toastGoster(liste.length + " ürün GEK listesine aktarıldı — GEK sitesini açın");
+    toastGoster(liste.length + " ürün GEK asistanına aktarıldı");
   };
 
-  const handleEksikSecileri = () => {
-    const eksikSet = new Set(Object.keys(eksikMap));
-    const yeni = new Set(secilen);
-    let sayi = 0;
-    for (const r of rows) {
-      if (eksikSet.has(r.barkod)) {
-        yeni.add(r.barkod);
-        sayi++;
-      }
-    }
-    if (sayi === 0) return;
-    onSecimDegis(yeni);
-    toastGoster(sayi + " eksik ürün seçildi");
-  };
-
-  const handleGekListesiniTemizle = () => {
+  const handleTemizle = () => {
     localStorage.removeItem(GEK_STORAGE_KEY);
     setGekListesiVar(false);
     toastGoster("GEK listesi temizlendi");
@@ -174,25 +190,19 @@ function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
       )}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         {Object.keys(eksikMap).length > 0 && (
-          <button onClick={handleEksikSecileri} style={{
-            padding: "10px 16px", background: "#fef3c7", color: "#92400e",
-            border: "1.5px solid #fcd34d", borderRadius: 8,
-            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          }}>
-            ⚠ Eksik Listedekilerini Seç ({Object.keys(eksikMap).length})
-          </button>
-        )}
-        {secilen.size > 0 && (
           <button onClick={handleAktar} style={{
-            padding: "10px 16px", background: gonderildi ? "#059669" : "#d97706",
+            padding: "10px 16px",
+            background: gonderildi ? "#059669" : "#d97706",
             color: "#fff", border: "none", borderRadius: 8,
             fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
           }}>
-            {gonderildi ? "✅ Aktarıldı!" : "🚛 GEK'e Aktar (" + secilen.size + " ürün)"}
+            {gonderildi
+              ? "✅ Aktarıldı!"
+              : "📋 Eksik Listesini GEK'e Aktar (" + Object.keys(eksikMap).length + " ürün)"}
           </button>
         )}
         {gekListesiVar && (
-          <button onClick={handleGekListesiniTemizle} style={{
+          <button onClick={handleTemizle} style={{
             padding: "10px 16px", background: "rgba(239,68,68,0.1)", color: "#ef4444",
             border: "1.5px solid #fca5a5", borderRadius: 8,
             fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
@@ -333,9 +343,8 @@ function KilavuzPanel({ info }) {
   );
 }
 
-function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
+function Table({ rows, search, eksikMap }) {
   const cols = [
-    { key: "sec",           label: "",             align: "center", w: 40 },
     { key: "barkod",        label: "Barkod",       align: "center", w: 118 },
     { key: "urun_adi",      label: "Ürün Adı",     align: "left",   w: "auto" },
     { key: "eksik",         label: "Eksik",        align: "center", w: 90 },
@@ -352,18 +361,6 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
     ? rows.filter(r => r.urun_adi?.toLowerCase().includes(search.toLowerCase()))
     : rows;
 
-  const hepsiniSec = filtered.length > 0 && filtered.every(r => secilen.has(r.barkod));
-
-  const handleHepsini = () => {
-    const yeni = new Set(secilen);
-    if (hepsiniSec) {
-      filtered.forEach(r => yeni.delete(r.barkod));
-    } else {
-      filtered.forEach(r => { if (r.parti_siparis > 0) yeni.add(r.barkod); });
-    }
-    onSecimDegis(yeni);
-  };
-
   return (
     <div style={{ overflowX: "auto", borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.07)" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 700 }}>
@@ -377,10 +374,7 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
                 textTransform: "uppercase", textAlign: c.align,
                 width: c.w !== "auto" ? c.w : undefined,
               }}>
-                {c.key === "sec"
-                  ? <input type="checkbox" checked={hepsiniSec} onChange={handleHepsini} style={{ cursor: "pointer", width: 15, height: 15 }} title="Hepsini seç" />
-                  : c.label
-                }
+c.label
               </th>
             ))}
           </tr>
@@ -392,14 +386,12 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
           {filtered.map((row, i) => {
             const cfg = STATUS_CONFIG[row.durum] || {};
             const eksikBilgi = eksikMap[row.barkod] || null;
-            const seciili = secilen.has(row.barkod);
             return (
               <tr key={i} style={{
-                background: seciili ? "#eff6ff"
-                  : eksikBilgi ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
+                background: eksikBilgi
+                  ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
                   : (i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA")),
                 borderBottom: "1px solid #E2E8F0",
-                outline: seciili ? "2px solid #2563EB" : "none",
               }}>
                 {cols.map(c => (
                   <td key={c.key} style={{
@@ -409,13 +401,7 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
                     fontFamily: c.key === "urun_adi" ? "inherit" : "'DM Mono', monospace",
                     fontSize: c.key === "urun_adi" ? 13 : 12,
                   }}>
-                    {c.key === "sec"
-                      ? <input type="checkbox" checked={seciili} onChange={() => {
-                          const yeni = new Set(secilen);
-                          seciili ? yeni.delete(row.barkod) : yeni.add(row.barkod);
-                          onSecimDegis(yeni);
-                        }} style={{ cursor: "pointer", width: 15, height: 15 }} />
-                      : c.key === "durum" ? <Badge durum={row.durum} />
+                    {c.key === "durum" ? <Badge durum={row.durum} />
                       : c.key === "eksik" ? <EksikRozet eksikBilgi={eksikBilgi} />
                       : c.key === "barkod" ? (row.barkod ?? "—")
                       : fmt(row[c.key])
@@ -431,27 +417,29 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
   );
 }
 
-// Firebase modüllerini bir kere yükle, cache'le
-let _firebaseDb = null;
-let _firestoreModul = null;
-
-async function firebaseBaslat() {
-  if (_firebaseDb && _firestoreModul) return { db: _firebaseDb, ..._firestoreModul };
-  const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-  const modul = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-  const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
-  _firebaseDb = modul.getFirestore(app);
-  _firestoreModul = modul;
-  return { db: _firebaseDb, ...modul };
-}
-
+// Firestore REST API — SDK yok, sadece fetch
 async function eksikListesiniCek() {
   try {
-    const { db, collection, query, where, getDocs } = await firebaseBaslat();
-    const q = query(collection(db, "eczaneler/" + ECZANE_KODU + "/eksikler"), where("durum", "==", "aktif"));
-    const snapshot = await getDocs(q);
+    const proje = FIREBASE_CONFIG.projectId;
+    const url = "https://firestore.googleapis.com/v1/projects/" + proje + "/databases/(default)/documents/eczaneler/" + ECZANE_KODU + "/eksikler?pageSize=200";
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const data = await res.json();
     const map = {};
-    snapshot.forEach(doc => { const v = doc.data(); map[v.barkod] = v; });
+    (data.documents || []).forEach(doc => {
+      const f = doc.fields || {};
+      if (f.durum?.stringValue !== "aktif") return;
+      const barkod = f.barkod?.stringValue;
+      if (!barkod) return;
+      map[barkod] = {
+        barkod,
+        urunAdi: f.urunAdi?.stringValue || "",
+        kullanicilar: (f.kullanicilar?.arrayValue?.values || []).map(v => v.stringValue || ""),
+        sonGirisTarihi: f.sonGirisTarihi?.timestampValue
+          ? { toDate: () => new Date(f.sonGirisTarihi.timestampValue) }
+          : null
+      };
+    });
     return map;
   } catch (e) {
     console.warn("Eksik listesi çekilemedi:", e.message);
@@ -469,7 +457,6 @@ export default function App() {
   const [tab, setTab] = useState("siparis");
   const [dlLoading, setDlLoading] = useState({ excel: false, pdf: false });
   const [eksikMap, setEksikMap] = useState({});
-  const [secilen, setSecilen] = useState(new Set());
   const resultsRef = useRef();
 
   useEffect(() => {
@@ -480,7 +467,7 @@ export default function App() {
   }, []);
 
   const handleFile = useCallback((f) => {
-    setResult(null); setError(null); setSecilen(new Set());
+    setResult(null); setError(null);
     const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
     if (![".xls", ".xlsx"].includes(ext)) {
       setError("Geçersiz dosya formatı. Sadece Excel (.xls / .xlsx) yüklenebilir.");
@@ -500,7 +487,7 @@ export default function App() {
 
   const handleHesapla = async () => {
     if (!file) return;
-    setLoading(true); setError(null); setResult(null); setSecilen(new Set());
+    setLoading(true); setError(null); setResult(null);
     const fd = new FormData();
     fd.append("file", file);
     try {
@@ -659,15 +646,8 @@ export default function App() {
             <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
               <DlButton onClick={() => handleDownload("excel")} loading={dlLoading.excel} color="#16A34A" icon="📥" label="Excel İndir" />
               <DlButton onClick={() => handleDownload("pdf")} loading={dlLoading.pdf} color="#DC2626" icon="📄" label="Acil Sipariş PDF" />
-              <GekAktarButon secilen={secilen} rows={aktifRows} eksikMap={eksikMap} onSecimDegis={setSecilen} />
+              <GekAktarButon rows={aktifRows} eksikMap={eksikMap} />
             </div>
-
-            {secilen.size > 0 && (
-              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "10px 16px", marginBottom: 12, fontSize: 13, color: "#1e40af", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>☑ <strong>{secilen.size} ürün</strong> seçili</span>
-                <button onClick={() => setSecilen(new Set())} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 12 }}>Seçimi Temizle</button>
-              </div>
-            )}
 
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "2px solid #E2E8F0" }}>
               {[
@@ -691,14 +671,14 @@ export default function App() {
                   placeholder="🔍 Ürün adı ara..."
                   style={{ width: "100%", padding: "10px 14px", fontSize: 14, border: "1.5px solid #CBD5E1", borderRadius: 8, outline: "none", marginBottom: 14, fontFamily: "inherit", background: "#fff" }}
                 />
-                <Table rows={aktifRows} search={search} eksikMap={eksikMap} secilen={secilen} onSecimDegis={setSecilen} />
+                <Table rows={aktifRows} search={search} eksikMap={eksikMap} />
               </>
             )}
 
             {tab === "dusuk" && (
               result.ozet.dusuk_devirli === 0
                 ? <div style={{ color: "#94A3B8", textAlign: "center", padding: 32 }}>Düşük devirli sipariş gereken ürün yok.</div>
-                : <Table rows={dusukRows} search="" eksikMap={eksikMap} secilen={secilen} onSecimDegis={setSecilen} />
+                : <Table rows={dusukRows} search="" eksikMap={eksikMap} />
             )}
 
             {tab === "haric" && (
