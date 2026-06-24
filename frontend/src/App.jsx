@@ -610,7 +610,7 @@ function KilavuzPanel({ info }) {
       renk: "#7C3AED",
       adimlar: [
         { n: 1, metin: "Sağ panelden Excel dosyasını yükleyin (sürükle-bırak veya tıkla)." },
-        { n: 2, metin: ""Sipariş Listesini Oluştur" butonuna tıklayın." },
+        { n: 2, metin: "'Sipariş Listesini Oluştur' butonuna tıklayın." },
         { n: 3, metin: "Sonuçlar ACİL, SİPARİŞ, DÜŞÜK DEVİRLİ ve GEREK YOK olarak sıralanır." },
         { n: 4, metin: "Miktarlar, ay sonuna kalan iş günü ihtiyacına göre otomatik hesaplanır." },
         { n: 5, metin: "Excel veya PDF olarak indirip yazdırabilirsiniz." },
@@ -638,8 +638,8 @@ function KilavuzPanel({ info }) {
         { n: 4, metin: ""🚛 GEK'e Aktar" butonuna tıklayın — seçilen ürünler ve parti miktarları kaydedilir." },
         { n: 5, metin: "GEK sitesine (esube.gek.org.tr) gidin ve giriş yapın." },
         { n: 6, metin: "Sağ üstteki GEK Sipariş Asistanı panelinde sıradaki ürün görünür." },
-        { n: 7, metin: ""🔍 Barkodu Ara" butonuna tıklayın — eklenti otomatik arama yapar." },
-        { n: 8, metin: "Ürün sayfasında kampanyayı seçin, miktarı kontrol edin, "Siparişe Ekle" tıklayın." },
+        { n: 7, metin: "'🔍 Barkodu Ara' butonuna tıklayın — eklenti otomatik arama yapar." },
+        { n: 8, metin: "Ürün sayfasında kampanyayı seçin, miktarı kontrol edin, 'Siparişe Ekle' tıklayın." },
         { n: 9, metin: "Eklenti otomatik olarak sıradaki ürünü arar. Tüm liste bitince sepeti onaylayın." },
       ]
     },
@@ -648,12 +648,12 @@ function KilavuzPanel({ info }) {
       baslik: "💡 İpuçları",
       renk: "#64748B",
       adimlar: [
-        { n: "•", metin: "Seçimi temizlemek için "Seçimi Temizle" butonunu kullanın." },
-        { n: "•", metin: "GEK listesini sıfırlamak için "🗑 GEK Listesini Temizle" butonunu kullanın." },
+        { n: "•", metin: "Seçimi temizlemek için 'Seçimi Temizle' butonunu kullanın." },
+        { n: "•", metin: "GEK listesini sıfırlamak için '🗑 GEK Listesini Temizle' butonunu kullanın." },
         { n: "•", metin: "Tablo başlığındaki checkbox ile tüm listeyi bir anda seçebilirsiniz." },
         { n: "•", metin: "Ürün adı arama kutusuyla tablo filtrelenebilir." },
         { n: "•", metin: "Düşük Devirli sekmesindeki ürünler de GEK'e aktarılabilir." },
-        { n: "•", metin: "GEK eklentisinde "Atla" butonu ile ürünü listeye dahil etmeden geçebilirsiniz." },
+        { n: "•", metin: "GEK eklentisinde 'Atla' butonu ile ürünü listeye dahil etmeden geçebilirsiniz." },
       ]
     }
   ];
