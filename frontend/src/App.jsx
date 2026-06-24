@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 const API = "https://eczane-engine-claude.onrender.com";
 const GEK_STORAGE_KEY = "gek_siparis_listesi";
@@ -333,7 +333,7 @@ function KilavuzPanel({ info }) {
   );
 }
 
-const Table = memo(function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
+function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
   const cols = [
     { key: "sec",           label: "",             align: "center", w: 40 },
     { key: "barkod",        label: "Barkod",       align: "center", w: 118 },
