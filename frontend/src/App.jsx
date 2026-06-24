@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 
 const API = "https://eczane-engine-claude.onrender.com";
 const GEK_STORAGE_KEY = "gek_siparis_listesi";
@@ -142,13 +142,18 @@ function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
   };
 
   const handleEksikSecileri = () => {
-    const eksikBarkodlar = Object.keys(eksikMap);
-    const eslesen = rows.filter(r => eksikBarkodlar.includes(r.barkod));
-    if (eslesen.length === 0) return;
+    const eksikSet = new Set(Object.keys(eksikMap));
     const yeni = new Set(secilen);
-    eslesen.forEach(r => yeni.add(r.barkod));
+    let sayi = 0;
+    for (const r of rows) {
+      if (eksikSet.has(r.barkod)) {
+        yeni.add(r.barkod);
+        sayi++;
+      }
+    }
+    if (sayi === 0) return;
     onSecimDegis(yeni);
-    toastGoster(eslesen.length + " eksik ürün seçildi");
+    toastGoster(sayi + " eksik ürün seçildi");
   };
 
   const handleGekListesiniTemizle = () => {
@@ -328,7 +333,7 @@ function KilavuzPanel({ info }) {
   );
 }
 
-function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
+const Table = memo(function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
   const cols = [
     { key: "sec",           label: "",             align: "center", w: 40 },
     { key: "barkod",        label: "Barkod",       align: "center", w: 118 },
@@ -426,12 +431,23 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
   );
 }
 
+// Firebase modüllerini bir kere yükle, cache'le
+let _firebaseDb = null;
+let _firestoreModul = null;
+
+async function firebaseBaslat() {
+  if (_firebaseDb && _firestoreModul) return { db: _firebaseDb, ..._firestoreModul };
+  const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+  const modul = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+  _firebaseDb = modul.getFirestore(app);
+  _firestoreModul = modul;
+  return { db: _firebaseDb, ...modul };
+}
+
 async function eksikListesiniCek() {
   try {
-    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-    const { getFirestore, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
-    const db = getFirestore(app);
+    const { db, collection, query, where, getDocs } = await firebaseBaslat();
     const q = query(collection(db, "eczaneler/" + ECZANE_KODU + "/eksikler"), where("durum", "==", "aktif"));
     const snapshot = await getDocs(q);
     const map = {};
@@ -523,7 +539,14 @@ export default function App() {
   };
 
   const eksikSayisi = Object.keys(eksikMap).length;
-  const aktifRows = result ? result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ") : [];
+  const aktifRows = useMemo(
+    () => result ? result.urunler.filter(u => u.durum !== "DÜŞÜK DEVİRLİ SİPARİŞ") : [],
+    [result]
+  );
+  const dusukRows = useMemo(
+    () => result ? result.urunler.filter(u => u.durum === "DÜŞÜK DEVİRLİ SİPARİŞ") : [],
+    [result]
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#F1F5F9", fontFamily: "'Sora', sans-serif" }}>
@@ -675,7 +698,7 @@ export default function App() {
             {tab === "dusuk" && (
               result.ozet.dusuk_devirli === 0
                 ? <div style={{ color: "#94A3B8", textAlign: "center", padding: 32 }}>Düşük devirli sipariş gereken ürün yok.</div>
-                : <Table rows={result.urunler.filter(u => u.durum === "DÜŞÜK DEVİRLİ SİPARİŞ")} search="" eksikMap={eksikMap} secilen={secilen} onSecimDegis={setSecilen} />
+                : <Table rows={dusukRows} search="" eksikMap={eksikMap} secilen={secilen} onSecimDegis={setSecilen} />
             )}
 
             {tab === "haric" && (
