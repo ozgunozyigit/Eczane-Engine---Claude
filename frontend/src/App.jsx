@@ -132,38 +132,23 @@ function GekAktarButon({ rows, eksikMap }) {
       return;
     }
 
-    // Eksik listedeki barkodları sipariş tablosunda eşleştir
-    const eksikSet = new Set(eksikBarkodlar);
-    const liste = [];
-
+    // Sadece eksikMap üzerinden liste oluştur — rows döngüsü yok
+    // Sipariş tablosundan parti_siparis bulmak için Map hazırla
+    const siparisMap = new Map();
     for (const r of rows) {
-      if (!eksikSet.has(r.barkod)) continue;
-      liste.push({
-        barkod: r.barkod,
-        urunAdi: r.urun_adi,
-        miktar: r.parti_siparis > 0 ? Math.round(r.parti_siparis) : 1,
+      siparisMap.set(r.barkod, r);
+    }
+
+    const liste = eksikBarkodlar.map(barkod => {
+      const siparis = siparisMap.get(barkod);
+      const eksikBilgi = eksikMap[barkod];
+      return {
+        barkod,
+        urunAdi: siparis ? siparis.urun_adi : (eksikBilgi.urunAdi || barkod),
+        miktar: siparis && siparis.parti_siparis > 0 ? Math.round(siparis.parti_siparis) : 1,
         tamamlandi: false
-      });
-    }
-
-    // Sipariş tablosunda olmayan eksik ürünleri de ekle (parti_siparis=1 ile)
-    const siparisBarkodar = new Set(rows.map(r => r.barkod));
-    for (const barkod of eksikBarkodlar) {
-      if (!siparisBarkodar.has(barkod)) {
-        const eksikBilgi = eksikMap[barkod];
-        liste.push({
-          barkod,
-          urunAdi: eksikBilgi.urunAdi || barkod,
-          miktar: 1,
-          tamamlandi: false
-        });
-      }
-    }
-
-    if (liste.length === 0) {
-      toastGoster("Aktarılacak ürün bulunamadı");
-      return;
-    }
+      };
+    });
 
     localStorage.setItem(GEK_STORAGE_KEY, JSON.stringify(liste));
     setGonderildi(true);
