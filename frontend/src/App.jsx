@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import toast, { Toaster } from "https://esm.sh/react-hot-toast@2.4.1";
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 
 const API = "https://eczane-engine-claude.onrender.com";
 const GEK_STORAGE_KEY = "gek_siparis_listesi";
@@ -54,7 +52,7 @@ function EksikRozet({ eksikBilgi }) {
         padding: "2px 8px", background: "#fef3c7", color: "#92400e",
         border: "1px solid #fcd34d", borderRadius: 12,
         fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap"
-      }} title="Eksik listesinde">⚠ EKSİK</span>
+      }}>⚠ EKSİK</span>
       {popup && (
         <>
           <div onClick={() => setPopup(false)} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
@@ -113,17 +111,19 @@ function DropZone({ onFile, loading }) {
   );
 }
 
-// GEK'e aktar butonu
 function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
   const [gonderildi, setGonderildi] = useState(false);
   const [gekListesiVar, setGekListesiVar] = useState(false);
+  const [mesaj, setMesaj] = useState("");
 
   useEffect(() => {
-    const kontrol = () => setGekListesiVar(!!localStorage.getItem(GEK_STORAGE_KEY));
-    kontrol();
-    window.addEventListener('storage', kontrol);
-    return () => window.removeEventListener('storage', kontrol);
+    setGekListesiVar(!!localStorage.getItem(GEK_STORAGE_KEY));
   }, []);
+
+  const toastGoster = (m) => {
+    setMesaj(m);
+    setTimeout(() => setMesaj(""), 3500);
+  };
 
   const handleAktar = () => {
     const secilenSatirlar = rows.filter(r => secilen.has(r.barkod) && r.parti_siparis > 0);
@@ -138,7 +138,7 @@ function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
     setGonderildi(true);
     setGekListesiVar(true);
     setTimeout(() => setGonderildi(false), 3000);
-    toast.success(`${liste.length} ürün GEK listesine aktarıldı — GEK sitesini açın`, { duration: 4000 });
+    toastGoster(liste.length + " ürün GEK listesine aktarıldı — GEK sitesini açın");
   };
 
   const handleEksikSecileri = () => {
@@ -148,45 +148,181 @@ function GekAktarButon({ secilen, rows, eksikMap, onSecimDegis }) {
     const yeni = new Set(secilen);
     eslesen.forEach(r => yeni.add(r.barkod));
     onSecimDegis(yeni);
+    toastGoster(eslesen.length + " eksik ürün seçildi");
   };
 
   const handleGekListesiniTemizle = () => {
     localStorage.removeItem(GEK_STORAGE_KEY);
     setGekListesiVar(false);
-    toast.success("GEK listesi temizlendi");
+    toastGoster("GEK listesi temizlendi");
   };
 
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-      {Object.keys(eksikMap).length > 0 && (
-        <button onClick={handleEksikSecileri} style={{
-          padding: "10px 16px", background: "#fef3c7", color: "#92400e",
-          border: "1.5px solid #fcd34d", borderRadius: 8,
-          fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          display: "flex", alignItems: "center", gap: 6,
-        }}>
-          ⚠ Eksik Listedekilerini Seç ({Object.keys(eksikMap).length})
-        </button>
+    <div>
+      {mesaj && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          background: "#0F172A", color: "#fff", padding: "10px 20px",
+          borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.2)"
+        }}>{mesaj}</div>
       )}
-      {secilen.size > 0 && (
-        <button onClick={handleAktar} style={{
-          padding: "10px 16px", background: gonderildi ? "#059669" : "#d97706",
-          color: "#fff", border: "none", borderRadius: 8,
-          fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          display: "flex", alignItems: "center", gap: 6,
-        }}>
-          {gonderildi ? "✅ Aktarıldı!" : `🚛 GEK'e Aktar (${secilen.size} ürün)`}
-        </button>
-      )}
-      {gekListesiVar && (
-        <button onClick={handleGekListesiniTemizle} style={{
-          padding: "10px 16px", background: "rgba(239,68,68,0.1)", color: "#ef4444",
-          border: "1.5px solid #fca5a5", borderRadius: 8,
-          fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          display: "flex", alignItems: "center", gap: 6,
-        }}>
-          🗑 GEK Listesini Temizle
-        </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {Object.keys(eksikMap).length > 0 && (
+          <button onClick={handleEksikSecileri} style={{
+            padding: "10px 16px", background: "#fef3c7", color: "#92400e",
+            border: "1.5px solid #fcd34d", borderRadius: 8,
+            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            ⚠ Eksik Listedekilerini Seç ({Object.keys(eksikMap).length})
+          </button>
+        )}
+        {secilen.size > 0 && (
+          <button onClick={handleAktar} style={{
+            padding: "10px 16px", background: gonderildi ? "#059669" : "#d97706",
+            color: "#fff", border: "none", borderRadius: 8,
+            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            {gonderildi ? "✅ Aktarıldı!" : "🚛 GEK'e Aktar (" + secilen.size + " ürün)"}
+          </button>
+        )}
+        {gekListesiVar && (
+          <button onClick={handleGekListesiniTemizle} style={{
+            padding: "10px 16px", background: "rgba(239,68,68,0.1)", color: "#ef4444",
+            border: "1.5px solid #fca5a5", borderRadius: 8,
+            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            🗑 GEK Listesini Temizle
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KilavuzPanel({ info }) {
+  const [acik, setAcik] = useState(false);
+  const [aktifBolum, setAktifBolum] = useState(null);
+
+  const tarihAraligi = info ? info.rapor_araligi_str : "son 3 tamamlanmis ay";
+
+  const bolumler = [
+    {
+      id: "rapor",
+      baslik: "📊 Rapor Hazırlama",
+      renk: "#2563EB",
+      adimlar: [
+        "Eczanem programını açın.",
+        "Üst menüden Raporlar → Satış Raporları seçin.",
+        "Sol sekmeden Ürün Bazında Toplamlar'ı seçin.",
+        "Tarih aralığını seçin: " + tarihAraligi,
+        "Raporu Excel olarak kaydedin (.xls veya .xlsx).",
+      ]
+    },
+    {
+      id: "siparis",
+      baslik: "🚀 Sipariş Listesi Oluşturma",
+      renk: "#7C3AED",
+      adimlar: [
+        "Sağ panelden Excel dosyasını yükleyin.",
+        "Sipariş Listesini Oluştur butonuna tıklayın.",
+        "Sonuçlar ACİL, SİPARİŞ, DÜŞÜK DEVİRLİ ve GEREK YOK olarak sıralanır.",
+        "Miktarlar, ay sonuna kalan iş günü ihtiyacına göre otomatik hesaplanır.",
+        "Excel veya PDF olarak indirip yazdırabilirsiniz.",
+      ]
+    },
+    {
+      id: "eksik",
+      baslik: "⚠ Eksik Listesi Takibi",
+      renk: "#D97706",
+      adimlar: [
+        "Personel Eksik Listesi uygulamasından rafta biten ürünleri ekler.",
+        "Eksik listedeki ürünler tabloda sarı EKSİK rozetiyle işaretlenir.",
+        "Rozete tıklayarak kimin eklediğini ve ne zaman eklendiğini görebilirsiniz.",
+        "Üst başlıkta toplam eksik ürün sayısı görüntülenir ve 60 saniyede bir güncellenir.",
+      ]
+    },
+    {
+      id: "gek",
+      baslik: "🚛 GEK'e Otomatik Sipariş",
+      renk: "#059669",
+      adimlar: [
+        "Sipariş listesi oluşturduktan sonra satırlardaki kutucukları işaretleyin.",
+        "Eksik Listedekilerini Seç butonuyla eksik ürünleri otomatik seçebilirsiniz.",
+        "İstediğiniz ürünleri manuel olarak da ekleyip çıkarabilirsiniz.",
+        "GEK'e Aktar butonuna tıklayın — seçilen ürünler ve parti miktarları kaydedilir.",
+        "GEK sitesine (esube.gek.org.tr) gidin ve giriş yapın.",
+        "Sağ üstteki GEK Sipariş Asistanı panelinde sıradaki ürün görünür.",
+        "Barkodu Ara butonuna tıklayın — eklenti otomatik arama yapar.",
+        "Ürün sayfasında kampanyayı seçin, miktarı kontrol edin, Siparişe Ekle tıklayın.",
+        "Eklenti otomatik olarak sıradaki ürünü arar. Tüm liste bitince sepeti onaylayın.",
+      ]
+    },
+    {
+      id: "ipuclari",
+      baslik: "💡 İpuçları",
+      renk: "#64748B",
+      adimlar: [
+        "Seçimi Temizle butonu ile yapılan seçimi sıfırlayabilirsiniz.",
+        "GEK Listesini Temizle butonu ile aktarılan listeyi sıfırlayabilirsiniz.",
+        "Tablo başlığındaki checkbox ile tüm listeyi bir anda seçebilirsiniz.",
+        "Ürün adı arama kutusuyla tablo filtrelenebilir.",
+        "Düşük Devirli sekmesindeki ürünler de GEK'e aktarılabilir.",
+        "GEK eklentisinde Atla butonu ile ürünü geçebilirsiniz.",
+      ]
+    }
+  ];
+
+  return (
+    <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+      <button
+        onClick={() => setAcik(!acik)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "none", border: "none", cursor: "pointer", padding: "4px 0",
+          fontFamily: "inherit"
+        }}
+      >
+        <span style={{ fontWeight: 800, fontSize: 15, color: "#0F172A" }}>📋 Kullanım Kılavuzu</span>
+        <span style={{ fontSize: 18, color: "#64748B" }}>{acik ? "▲" : "▼"}</span>
+      </button>
+
+      {acik && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          {bolumler.map(b => (
+            <div key={b.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+              <button
+                onClick={() => setAktifBolum(aktifBolum === b.id ? null : b.id)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: aktifBolum === b.id ? "#f8faff" : "#fff",
+                  border: "none", cursor: "pointer", padding: "10px 14px",
+                  fontFamily: "inherit"
+                }}
+              >
+                <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{b.baslik}</span>
+                <span style={{ fontSize: 12, color: "#94A3B8" }}>{aktifBolum === b.id ? "▲" : "▼"}</span>
+              </button>
+
+              {aktifBolum === b.id && (
+                <div style={{ padding: "10px 14px", background: "#f8faff", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {b.adimlar.map((s, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#374151" }}>
+                      <span style={{
+                        minWidth: 22, height: 22, borderRadius: "50%",
+                        background: b.renk, color: "#fff",
+                        fontSize: 11, fontWeight: 800,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        marginTop: 1, flexShrink: 0
+                      }}>{i + 1}</span>
+                      <span style={{ lineHeight: 1.6 }}>{s}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -211,7 +347,7 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
     ? rows.filter(r => r.urun_adi?.toLowerCase().includes(search.toLowerCase()))
     : rows;
 
-  const hepsiniSec = filtered.every(r => secilen.has(r.barkod));
+  const hepsiniSec = filtered.length > 0 && filtered.every(r => secilen.has(r.barkod));
 
   const handleHepsini = () => {
     const yeni = new Set(secilen);
@@ -231,13 +367,13 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
             {cols.map(c => (
               <th key={c.key} style={{
                 padding: "10px 12px",
-                color: c.key === "eksik" ? "#fcd34d" : c.key === "sec" ? "#fff" : "#E2E8F0",
+                color: c.key === "eksik" ? "#fcd34d" : "#E2E8F0",
                 fontWeight: 700, fontSize: 11, letterSpacing: "0.07em",
                 textTransform: "uppercase", textAlign: c.align,
                 width: c.w !== "auto" ? c.w : undefined,
               }}>
                 {c.key === "sec"
-                  ? <input type="checkbox" checked={hepsiniSec && filtered.length > 0} onChange={handleHepsini} style={{ cursor: "pointer", width: 15, height: 15 }} title="Hepsini seç" />
+                  ? <input type="checkbox" checked={hepsiniSec} onChange={handleHepsini} style={{ cursor: "pointer", width: 15, height: 15 }} title="Hepsini seç" />
                   : c.label
                 }
               </th>
@@ -254,11 +390,9 @@ function Table({ rows, search, eksikMap, secilen, onSecimDegis }) {
             const seciili = secilen.has(row.barkod);
             return (
               <tr key={i} style={{
-                background: seciili
-                  ? "#eff6ff"
-                  : eksikBilgi
-                    ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
-                    : (i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA")),
+                background: seciili ? "#eff6ff"
+                  : eksikBilgi ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
+                  : (i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA")),
                 borderBottom: "1px solid #E2E8F0",
                 outline: seciili ? "2px solid #2563EB" : "none",
               }}>
@@ -298,7 +432,7 @@ async function eksikListesiniCek() {
     const { getFirestore, collection, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
     const db = getFirestore(app);
-    const q = query(collection(db, `eczaneler/${ECZANE_KODU}/eksikler`), where("durum", "==", "aktif"));
+    const q = query(collection(db, "eczaneler/" + ECZANE_KODU + "/eksikler"), where("durum", "==", "aktif"));
     const snapshot = await getDocs(q);
     const map = {};
     snapshot.forEach(doc => { const v = doc.data(); map[v.barkod] = v; });
@@ -323,7 +457,7 @@ export default function App() {
   const resultsRef = useRef();
 
   useEffect(() => {
-    fetch(`${API}/api/info`).then(r => r.json()).then(setInfo).catch(() => setInfo(null));
+    fetch(API + "/api/info").then(r => r.json()).then(setInfo).catch(() => setInfo(null));
     eksikListesiniCek().then(setEksikMap);
     const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
     return () => clearInterval(interval);
@@ -333,7 +467,7 @@ export default function App() {
     setResult(null); setError(null); setSecilen(new Set());
     const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
     if (![".xls", ".xlsx"].includes(ext)) {
-      setError(`❌ Geçersiz dosya formatı: "${f.name}"\n\nSadece Excel dosyası yüklenebilir.`);
+      setError("Geçersiz dosya formatı. Sadece Excel (.xls / .xlsx) yüklenebilir.");
       setFile(null); return;
     }
     setFile(f);
@@ -342,10 +476,10 @@ export default function App() {
   const formatError = (msg) => {
     if (!msg) return "Bilinmeyen bir hata oluştu.";
     if (msg.includes("Dosya okunamadı") || msg.includes("Excel"))
-      return "❌ Dosya okunamadı.\n\nLütfen şunları kontrol edin:\n• Eczanem → Raporlar → Ürün Bazında Toplamlar raporunu seçtiniz mi?\n• Dosya Excel formatında (.xls / .xlsx) mı kaydedildi?";
+      return "Dosya okunamadı. Eczanem → Raporlar → Ürün Bazında Toplamlar raporunu Excel olarak kaydedin.";
     if (msg.includes("sütun") || msg.includes("column"))
-      return "❌ Dosya yapısı uyumsuz.\n\nBu rapor 'Ürün Bazında Toplamlar' formatında değil.";
-    return `❌ Hata: ${msg}`;
+      return "Dosya yapısı uyumsuz. Bu rapor Ürün Bazında Toplamlar formatında değil.";
+    return "Hata: " + msg;
   };
 
   const handleHesapla = async () => {
@@ -354,7 +488,7 @@ export default function App() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await fetch(`${API}/api/hesapla`, { method: "POST", body: fd });
+      const res = await fetch(API + "/api/hesapla", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Bilinmeyen hata");
       setResult(data);
@@ -373,7 +507,7 @@ export default function App() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await fetch(`${API}/api/${type === "excel" ? "excel-indir" : "pdf-indir"}`, { method: "POST", body: fd });
+      const res = await fetch(API + "/api/" + (type === "excel" ? "excel-indir" : "pdf-indir"), { method: "POST", body: fd });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -382,7 +516,7 @@ export default function App() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("İndirme hatası: " + e.message);
+      console.error("İndirme hatası:", e.message);
     } finally {
       setDlLoading(d => ({ ...d, [type]: false }));
     }
@@ -393,7 +527,6 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#F1F5F9", fontFamily: "'Sora', sans-serif" }}>
-      <Toaster position="top-center" toastOptions={{ style: { fontFamily: "inherit", fontSize: 13 } }} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; }
@@ -479,7 +612,7 @@ export default function App() {
               {loading ? "⏳ Hesaplanıyor..." : "🚀 Sipariş Listesini Oluştur"}
             </button>
             {error && (
-              <div style={{ marginTop: 12, padding: "12px 14px", background: "#FEF2F2", borderRadius: 8, color: "#B91C1C", fontSize: 13, border: "1px solid #FECACA", lineHeight: 1.8, whiteSpace: "pre-line" }}>
+              <div style={{ marginTop: 12, padding: "12px 14px", background: "#FEF2F2", borderRadius: 8, color: "#B91C1C", fontSize: 13, border: "1px solid #FECACA", lineHeight: 1.8 }}>
                 {error}
               </div>
             )}
@@ -500,7 +633,7 @@ export default function App() {
               ⏳ Sipariş önerileri, ay sonuna kadar kalan <strong>{result.ozet.kalan_is_gunu} resmi iş günü</strong> ihtiyacına göre hesaplanmıştır.
             </div>
 
-            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
               <DlButton onClick={() => handleDownload("excel")} loading={dlLoading.excel} color="#16A34A" icon="📥" label="Excel İndir" />
               <DlButton onClick={() => handleDownload("pdf")} loading={dlLoading.pdf} color="#DC2626" icon="📄" label="Acil Sipariş PDF" />
               <GekAktarButon secilen={secilen} rows={aktifRows} eksikMap={eksikMap} onSecimDegis={setSecilen} />
@@ -508,16 +641,16 @@ export default function App() {
 
             {secilen.size > 0 && (
               <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "10px 16px", marginBottom: 12, fontSize: 13, color: "#1e40af", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>☑ <strong>{secilen.size} ürün</strong> seçili — GEK'e aktarmak için butona tıklayın</span>
+                <span>☑ <strong>{secilen.size} ürün</strong> seçili</span>
                 <button onClick={() => setSecilen(new Set())} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 12 }}>Seçimi Temizle</button>
               </div>
             )}
 
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "2px solid #E2E8F0" }}>
               {[
-                { key: "siparis", label: `Sipariş Listesi (${aktifRows.length})` },
-                { key: "dusuk",   label: `Düşük Devirli (${result.ozet.dusuk_devirli})` },
-                { key: "haric",   label: `Liste Dışı (${result.haric_tutulanlar.length})` },
+                { key: "siparis", label: "Sipariş Listesi (" + aktifRows.length + ")" },
+                { key: "dusuk",   label: "Düşük Devirli (" + result.ozet.dusuk_devirli + ")" },
+                { key: "haric",   label: "Liste Dışı (" + result.haric_tutulanlar.length + ")" },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{
                   padding: "8px 18px", border: "none", background: "none", cursor: "pointer",
@@ -582,133 +715,6 @@ export default function App() {
           </div>
         )}
       </main>
-    </div>
-  );
-}
-
-
-function KilavuzPanel({ info }) {
-  const [acik, setAcik] = useState(false);
-  const [aktifBolum, setAktifBolum] = useState(null);
-
-  const bolumler = [
-    {
-      id: "rapor",
-      baslik: "📊 Rapor Hazırlama",
-      renk: "#2563EB",
-      adimlar: [
-        { n: 1, metin: "Eczanem programını açın." },
-        { n: 2, metin: "Üst menüden Raporlar → Satış Raporları seçin." },
-        { n: 3, metin: "Sol sekmeden Ürün Bazında Toplamlar'ı seçin." },
-        { n: 4, metin: info ? `Tarih aralığını seçin: ${info.rapor_araligi_str}` : "Son 3 tamamlanmış ayı tarih aralığı olarak seçin." },
-        { n: 5, metin: "Raporu Excel olarak kaydedin (.xls veya .xlsx)." },
-      ]
-    },
-    {
-      id: "siparis",
-      baslik: "🚀 Sipariş Listesi Oluşturma",
-      renk: "#7C3AED",
-      adimlar: [
-        { n: 1, metin: "Sağ panelden Excel dosyasını yükleyin (sürükle-bırak veya tıkla)." },
-        { n: 2, metin: "'Sipariş Listesini Oluştur' butonuna tıklayın." },
-        { n: 3, metin: "Sonuçlar ACİL, SİPARİŞ, DÜŞÜK DEVİRLİ ve GEREK YOK olarak sıralanır." },
-        { n: 4, metin: "Miktarlar, ay sonuna kalan iş günü ihtiyacına göre otomatik hesaplanır." },
-        { n: 5, metin: "Excel veya PDF olarak indirip yazdırabilirsiniz." },
-      ]
-    },
-    {
-      id: "eksik",
-      baslik: "⚠ Eksik Listesi Takibi",
-      renk: "#D97706",
-      adimlar: [
-        { n: 1, metin: "Personel Eksik Listesi uygulamasından rafta biten ürünleri ekler." },
-        { n: 2, metin: "Eksik listedeki ürünler tabloda sarı ⚠ EKSİK rozetiyle işaretlenir." },
-        { n: 3, metin: "Rozete tıklayarak kimin eklediğini ve ne zaman eklendiğini görebilirsiniz." },
-        { n: 4, metin: "Üst başlıkta toplam eksik ürün sayısı görüntülenir ve otomatik güncellenir." },
-      ]
-    },
-    {
-      id: "gek",
-      baslik: "🚛 GEK'e Otomatik Sipariş",
-      renk: "#059669",
-      adimlar: [
-        { n: 1, metin: "Sipariş listesi oluşturduktan sonra satırlardaki kutucukları işaretleyin." },
-        { n: 2, metin: ""⚠ Eksik Listedekilerini Seç" butonuyla eksik ürünleri otomatik seçebilirsiniz." },
-        { n: 3, metin: "İstediğiniz ürünleri manuel olarak da seçip çıkarabilirsiniz." },
-        { n: 4, metin: ""🚛 GEK'e Aktar" butonuna tıklayın — seçilen ürünler ve parti miktarları kaydedilir." },
-        { n: 5, metin: "GEK sitesine (esube.gek.org.tr) gidin ve giriş yapın." },
-        { n: 6, metin: "Sağ üstteki GEK Sipariş Asistanı panelinde sıradaki ürün görünür." },
-        { n: 7, metin: "'🔍 Barkodu Ara' butonuna tıklayın — eklenti otomatik arama yapar." },
-        { n: 8, metin: "Ürün sayfasında kampanyayı seçin, miktarı kontrol edin, 'Siparişe Ekle' tıklayın." },
-        { n: 9, metin: "Eklenti otomatik olarak sıradaki ürünü arar. Tüm liste bitince sepeti onaylayın." },
-      ]
-    },
-    {
-      id: "ipuclari",
-      baslik: "💡 İpuçları",
-      renk: "#64748B",
-      adimlar: [
-        { n: "•", metin: "Seçimi temizlemek için 'Seçimi Temizle' butonunu kullanın." },
-        { n: "•", metin: "GEK listesini sıfırlamak için '🗑 GEK Listesini Temizle' butonunu kullanın." },
-        { n: "•", metin: "Tablo başlığındaki checkbox ile tüm listeyi bir anda seçebilirsiniz." },
-        { n: "•", metin: "Ürün adı arama kutusuyla tablo filtrelenebilir." },
-        { n: "•", metin: "Düşük Devirli sekmesindeki ürünler de GEK'e aktarılabilir." },
-        { n: "•", metin: "GEK eklentisinde 'Atla' butonu ile ürünü listeye dahil etmeden geçebilirsiniz." },
-      ]
-    }
-  ];
-
-  return (
-    <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-      <button
-        onClick={() => setAcik(!acik)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-          background: "none", border: "none", cursor: "pointer", padding: "4px 0",
-          fontFamily: "inherit"
-        }}
-      >
-        <span style={{ fontWeight: 800, fontSize: 15, color: "#0F172A" }}>📋 Kullanım Kılavuzu</span>
-        <span style={{ fontSize: 18, color: "#64748B", transition: "transform 0.2s", display: "inline-block", transform: acik ? "rotate(180deg)" : "rotate(0deg)" }}>⌄</span>
-      </button>
-
-      {acik && (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-          {bolumler.map(b => (
-            <div key={b.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-              <button
-                onClick={() => setAktifBolum(aktifBolum === b.id ? null : b.id)}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                  background: aktifBolum === b.id ? "#f8faff" : "#fff",
-                  border: "none", cursor: "pointer", padding: "10px 14px",
-                  fontFamily: "inherit"
-                }}
-              >
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{b.baslik}</span>
-                <span style={{ fontSize: 14, color: "#94A3B8", transform: aktifBolum === b.id ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.15s" }}>⌄</span>
-              </button>
-
-              {aktifBolum === b.id && (
-                <div style={{ padding: "10px 14px", background: "#f8faff", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {b.adimlar.map((s, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#374151" }}>
-                      <span style={{
-                        minWidth: 22, height: 22, borderRadius: "50%",
-                        background: b.renk, color: "#fff",
-                        fontSize: 11, fontWeight: 800,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        marginTop: 1, flexShrink: 0
-                      }}>{s.n}</span>
-                      <span style={{ lineHeight: 1.6 }}>{s.metin}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
