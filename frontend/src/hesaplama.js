@@ -101,6 +101,10 @@ function normalizeUrunAdi(text) {
   text = text.replace(/\s+/g, "")
   text = text.replace(/%O/g, "%0")
   for (let i = 0; i < 5; i++) text = text.replace(/(\d)O/g, "$10")
+  // GR → MG dönüşümü: 1GR = 1000MG, 0.5GR = 500MG
+  text = text.replace(/(\d+(?:\.\d+)?)GR(?=[^A-Z]|$)/g, (_, sayi) => {
+    return Math.round(parseFloat(sayi) * 1000) + "MG"
+  })
   return text
 }
 
@@ -182,11 +186,12 @@ function levenshteinRatio(a, b) {
   const dp = new Uint16Array((m+1)*(n+1))
   for (let i = 0; i <= m; i++) dp[i*(n+1)] = i
   for (let j = 0; j <= n; j++) dp[j] = j
-  for (let i = 1; i <= m; i++)
+  for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i-1] === b[j-1] ? 0 : 1
       dp[i*(n+1)+j] = Math.min(dp[(i-1)*(n+1)+j]+1, dp[i*(n+1)+(j-1)]+1, dp[(i-1)*(n+1)+(j-1)]+cost)
     }
+  }
   const dist = dp[m*(n+1)+n]
   return Math.round((1 - (2*dist)/(m+n)) * 100)
 }
