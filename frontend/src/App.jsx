@@ -480,9 +480,9 @@ export default function App() {
       })
       .catch(() => setInfo(null));
 
+    // Eksik listesini SADECE sayfa açılışında bir kez çek.
+    // Polling YOK — rapor oluşturulunca ayrıca bir kez daha çekilir (handleHesapla içinde).
     eksikListesiniCek().then(setEksikMap);
-    const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleFile = useCallback((f) => {
