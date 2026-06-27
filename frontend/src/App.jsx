@@ -449,7 +449,7 @@ export default function App() {
     // Info'yu frontend'de hesapla — backend'e gerek yok
     import("./hesaplama.js").then(({ siparisHesapla, barkodListesiniYukle }) => {
       // Barkod listesini yükle
-      fetch("https://raw.githubusercontent.com/ozgunozyigit/eksiklistesi/main/public/data/urun_listesi.json")
+      fetch("/data/urun_listesi.json")
         .then(r => r.json())
         .then(urunler => {
           barkodListesiniYukle(urunler);
