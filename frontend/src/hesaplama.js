@@ -198,30 +198,56 @@ function siparisDurumuBelirle(row) {
 }
 
 // ── Barkod Eşleştirme ─────────────────────────────────────────────────────
-const BACKEND_URL = "https://eczane-engine-claude.onrender.com"
+// Barkod lookup — startup'ta yüklenir
+let _normDict = {}   // norm_ad -> barkod
+let _norm2Dict = {}  // norm2_ad -> barkod  
+let _keys = []
 
-// Barkod eşleştirme — Render'daki rapidfuzz kullanır
-export async function barkodlariniEslestir(urunAdlari) {
-  try {
-    const res = await fetch(BACKEND_URL + "/api/barkod-eslestir", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urun_adlari: urunAdlari })
-    })
-    if (!res.ok) return {}
-    const data = await res.json()
-    return data.eslesmeler || {}
-  } catch (e) {
-    console.warn("Barkod eşleştirme hatası:", e.message)
-    return {}
+export function barkodListesiniYukle(urunler) {
+  _normDict = {}
+  _norm2Dict = {}
+  for (const u of urunler) {
+    if (!u.barkod || !u.ad) continue
+    const norm = normalizeUrunAdi(u.ad)
+    if (!norm) continue
+    _normDict[norm] = String(u.barkod)
+    _norm2Dict[normalize2(norm)] = String(u.barkod)
   }
+  _keys = Object.keys(_normDict)
 }
 
-// Eski fonksiyon — artık kullanılmıyor ama import hatası olmasın
-export function barkodListesiniYukle() {}
+function barkodBul(normKey) {
+  if (!_keys.length) return null
+  // 1. Tam eşleşme
+  if (_normDict[normKey]) return _normDict[normKey]
+  const n2 = normalize2(normKey)
+  if (_norm2Dict[n2]) return _norm2Dict[n2]
+  // 2. Prefix + ratio + partial_ratio
+  const prefix = normKey.substring(0, 6)
+  const adaylar = _keys.filter(k => k.startsWith(prefix))
+  if (!adaylar.length) return null
+  let enIyi = null, enIyiSkor = 0
+  for (const aday of adaylar) {
+    const a2 = normalize2(aday)
+    const s1 = levenshteinRatio(n2, a2)
+    const s2 = partialRatio(n2, a2) * 0.90
+    const skor = Math.max(s1, s2)
+    if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = aday }
+  }
+  return (enIyiSkor >= 68 && enIyi) ? _normDict[enIyi] : null
+}
 
-// Levenshtein ratio — rapidfuzz.fuzz.ratio ile aynı mantık
-function benzerlikSkoru(a, b) {
+// Senkron barkod eşleştirme (siparisHesapla içinden çağrılır)
+export function barkodlariniEslestir(urunAdlari) {
+  const result = {}
+  for (const ad of urunAdlari) {
+    const norm = normalizeUrunAdi(ad)
+    result[ad] = barkodBul(norm)
+  }
+  return result
+}
+
+function levenshteinRatio(a, b) {
   const m = a.length, n = b.length
   if (m === 0 && n === 0) return 100
   if (m === 0 || n === 0) return 0
@@ -320,7 +346,7 @@ export function siparisHesapla(satirlar) {
     const oncelik = {"ACİL":1,"SİPARİŞ":2,"DÜŞÜK DEVİRLİ SİPARİŞ":3,"GEREK YOK":4}
     row.siparis_onceligi = oncelik[row.siparis_durumu] || 99
     row.gorunen_urun_adi = gorunenUrunAdiOlustur(normAd)
-    row.barkod = null // Barkodlar ayrıca eşleştirilecek
+    row.barkod = barkodBul(normAd)
 
     urunler.push(row)
   }
