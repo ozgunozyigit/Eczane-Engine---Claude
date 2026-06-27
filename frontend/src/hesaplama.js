@@ -217,20 +217,40 @@ export function barkodListesiniYukle(urunler) {
 
 function barkodBul(normKey) {
   if (!_barkodDict) return null
+  // 1. Tam eşleşme
   if (_barkodDict[normKey]) return _barkodDict[normKey]
   const n2 = normalize2(normKey)
   if (_barkodDict2[n2]) return _barkodDict2[n2]
-  // Prefix + basit eşleşme (rapidfuzz yerine)
+  // 2. Prefix ile aday bul (ilk 6 karakter)
   const prefix = normKey.substring(0, 6)
   const adaylar = _barkodKeys.filter(k => k.startsWith(prefix))
   if (adaylar.length === 0) return null
-  // En uzun ortak prefix'e göre en iyi eşleşmeyi bul
+  // 3. ratio + partial_ratio ile en iyi eşleşmeyi bul
   let enIyi = null, enIyiSkor = 0
   for (const aday of adaylar) {
-    const skor = benzerlikSkoru(n2, normalize2(aday))
-    if (skor > enIyiSkor && skor >= 80) { enIyiSkor = skor; enIyi = aday }
+    const a2 = normalize2(aday)
+    const s1 = benzerlikSkoru(n2, a2)
+    const s2 = partialBenzerlik(n2, a2) * 0.85
+    const skor = Math.max(s1, s2)
+    if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = aday }
   }
-  return enIyi ? _barkodDict[enIyi] : null
+  return (enIyiSkor >= 72 && enIyi) ? _barkodDict[enIyi] : null
+}
+
+// Partial ratio — kısa string uzun string içinde aranır
+function partialBenzerlik(a, b) {
+  if (a.length === 0 || b.length === 0) return 0
+  // Kısa olanı uzun olanda kaydırarak ara
+  const [kisa, uzun] = a.length <= b.length ? [a, b] : [b, a]
+  const w = kisa.length
+  let enIyi = 0
+  for (let i = 0; i <= uzun.length - w; i++) {
+    const alt = uzun.substring(i, i + w)
+    const skor = benzerlikSkoru(kisa, alt)
+    if (skor > enIyi) enIyi = skor
+    if (enIyi === 100) break
+  }
+  return enIyi
 }
 
 // Levenshtein ratio — rapidfuzz.fuzz.ratio ile aynı mantık
