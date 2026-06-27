@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import * as XLSX from "xlsx";
+import { siparisHesapla, barkodListesiniYukle } from "./hesaplama.js";
 
-const API = "https://eczane-engine-claude.onrender.com";
 const GEK_STORAGE_KEY = "gek_siparis_listesi";
 
 const FIREBASE_CONFIG = {
