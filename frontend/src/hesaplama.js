@@ -222,44 +222,41 @@ export function barkodListesiniYukle(urunler) {
   _keys = Object.keys(_normDict)
 }
 
-function enIyiEslesme(normKey, adaylar, esik) {
-  const n2 = normalize2(normKey)
-  let enIyi = null, enIyiSkor = 0
-  for (const aday of adaylar) {
-    const a2 = normalize2(aday)
-    const s1 = levenshteinRatio(n2, a2)
-    const s2 = partialRatio(n2, a2) * 0.90
-    const skor = Math.max(s1, s2)
-    if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = aday }
-  }
-  return enIyiSkor >= esik ? enIyi : null
-}
-
 function barkodBul(normKey) {
   if (!_keys.length) return null
 
   // 1. Tam eşleşme
   if (_normDict[normKey]) return _normDict[normKey]
-  const n2 = normalize2(normKey)
-  if (_norm2Dict[n2]) return _norm2Dict[n2]
+  const nk2 = normalize2(normKey)
+  if (_norm2Dict[nk2]) return _norm2Dict[nk2]
 
-  // 2. Kademeli prefix + kademeli eşik
-  // Her turda prefix'i kısaltarak daha geniş aday havuzu al
-  // ve eşiği düşür
-  const turlar = [
-    { prefixUzunluk: 6, esik: 80 },
-    { prefixUzunluk: 6, esik: 70 },
-    { prefixUzunluk: 5, esik: 65 },
-    { prefixUzunluk: 4, esik: 60 },
-  ]
-
-  for (const { prefixUzunluk, esik } of turlar) {
-    const prefix = normKey.substring(0, prefixUzunluk)
-    const adaylar = _keys.filter(k => k.startsWith(prefix))
-    if (!adaylar.length) continue
-    const sonuc = enIyiEslesme(normKey, adaylar, esik)
-    if (sonuc) return _normDict[sonuc]
+  // 2. Kademeli prefix ile aday bul (6 → 5 → 4 karakter)
+  let adaylar = []
+  for (const prefLen of [6, 5, 4]) {
+    const prefix = normKey.substring(0, prefLen)
+    adaylar = _keys.filter(k => k.startsWith(prefix))
+    if (adaylar.length) break
   }
+  if (!adaylar.length) return null
+
+  // 3. Tüm adayların skorunu hesapla
+  const skorlu = adaylar.map(aday => {
+    const a2 = normalize2(aday)
+    const s1 = levenshteinRatio(nk2, a2)
+    const s2 = partialRatio(nk2, a2) * 0.90
+    return { aday, skor: Math.max(s1, s2) }
+  }).sort((a, b) => b.skor - a.skor)
+
+  const { aday: enIyi, skor: enSkor } = skorlu[0]
+
+  // 4. Güvenli eşleşme (≥80)
+  if (enSkor >= 80) return _normDict[enIyi]
+
+  // 5. Tek aday varsa skoru ne olursa olsun al (≥40)
+  if (adaylar.length === 1 && enSkor >= 20) return _normDict[enIyi]
+
+  // 6. Birden fazla aday: en iyisi ≥60 ise al
+  if (enSkor >= 60) return _normDict[enIyi]
 
   return null
 }
