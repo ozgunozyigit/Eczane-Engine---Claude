@@ -253,7 +253,7 @@ function barkodBul(normKey) {
   if (enSkor >= 80) return _normDict[enIyi]
 
   // 5. Tek aday varsa skoru ne olursa olsun al (≥40)
-  if (adaylar.length === 1 && enSkor >= 20) return _normDict[enIyi]
+  if (adaylar.length === 1 && enSkor >= 40) return _normDict[enIyi]
 
   // 6. Birden fazla aday: en iyisi ≥60 ise al
   if (enSkor >= 60) return _normDict[enIyi]
