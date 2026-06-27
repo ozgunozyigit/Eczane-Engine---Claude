@@ -233,17 +233,28 @@ function barkodBul(normKey) {
   return enIyi ? _barkodDict[enIyi] : null
 }
 
-// Basit benzerlik skoru (Levenshtein tabanlı, 0-100)
+// Levenshtein ratio — rapidfuzz.fuzz.ratio ile aynı mantık
 function benzerlikSkoru(a, b) {
   const m = a.length, n = b.length
   if (m === 0 && n === 0) return 100
   if (m === 0 || n === 0) return 0
-  const dp = Array.from({length: m+1}, (_,i) => Array.from({length: n+1}, (_,j) => i===0?j:j===0?i:0))
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
-  const dist = dp[m][n]
-  return Math.round((1 - dist / Math.max(m, n)) * 100)
+  // Uzunluk farkı çok fazlaysa hızlı ret
+  if (Math.abs(m - n) / Math.max(m, n) > 0.5) return 0
+  const dp = new Uint16Array((m + 1) * (n + 1))
+  for (let i = 0; i <= m; i++) dp[i * (n + 1)] = i
+  for (let j = 0; j <= n; j++) dp[j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i-1] === b[j-1] ? 0 : 1
+      dp[i*(n+1)+j] = Math.min(
+        dp[(i-1)*(n+1)+j] + 1,
+        dp[i*(n+1)+(j-1)] + 1,
+        dp[(i-1)*(n+1)+(j-1)] + cost
+      )
+    }
+  }
+  const dist = dp[m*(n+1)+n]
+  return Math.round((1 - (2 * dist) / (m + n)) * 100)
 }
 
 // ── ANA HESAPLAMA FONKSİYONU ──────────────────────────────────────────────
