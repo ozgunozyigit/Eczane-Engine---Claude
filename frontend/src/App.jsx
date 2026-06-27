@@ -180,96 +180,6 @@ function AktarButonlari({ rows, secilenBarkodlar, eksikMap }) {
   );
 }
 
-// ── ESKİ GekAktarButon (silindi, AktarButonlari ile değiştirildi) ──
-function GekAktarButon({ rows, eksikMap }) {
-  const [gonderildi, setGonderildi] = useState(false);
-  const [gekListesiVar, setGekListesiVar] = useState(false);
-  const [mesaj, setMesaj] = useState("");
-
-  useEffect(() => {
-    setGekListesiVar(!!localStorage.getItem(GEK_STORAGE_KEY));
-  }, []);
-
-  const toastGoster = (m) => {
-    setMesaj(m);
-    setTimeout(() => setMesaj(""), 3500);
-  };
-
-  const handleAktar = () => {
-    const eksikBarkodlar = Object.keys(eksikMap);
-    if (eksikBarkodlar.length === 0) {
-      toastGoster("Eksik listesi boş");
-      return;
-    }
-
-    // Sadece eksikMap üzerinden liste oluştur — rows döngüsü yok
-    // Sipariş tablosundan parti_siparis bulmak için Map hazırla
-    const siparisMap = new Map();
-    for (const r of rows) {
-      siparisMap.set(r.barkod, r);
-    }
-
-    const liste = eksikBarkodlar.map(barkod => {
-      const siparis = siparisMap.get(barkod);
-      const eksikBilgi = eksikMap[barkod];
-      return {
-        barkod,
-        urunAdi: siparis ? siparis.urun_adi : (eksikBilgi.urunAdi || barkod),
-        miktar: siparis && siparis.parti_siparis > 0 ? Math.round(siparis.parti_siparis) : 1,
-        tamamlandi: false
-      };
-    });
-
-    localStorage.setItem(GEK_STORAGE_KEY, JSON.stringify(liste));
-    setGonderildi(true);
-    setGekListesiVar(true);
-    setTimeout(() => setGonderildi(false), 3000);
-    toastGoster(liste.length + " ürün GEK asistanına aktarıldı");
-  };
-
-  const handleTemizle = () => {
-    localStorage.removeItem(GEK_STORAGE_KEY);
-    setGekListesiVar(false);
-    toastGoster("GEK listesi temizlendi");
-  };
-
-  return (
-    <div>
-      {mesaj && (
-        <div style={{
-          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
-          background: "#0F172A", color: "#fff", padding: "10px 20px",
-          borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.2)"
-        }}>{mesaj}</div>
-      )}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {Object.keys(eksikMap).length > 0 && (
-          <button onClick={handleAktar} style={{
-            padding: "10px 16px",
-            background: gonderildi ? "#059669" : "#d97706",
-            color: "#fff", border: "none", borderRadius: 8,
-            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          }}>
-            {gonderildi
-              ? "✅ Aktarıldı!"
-              : "📋 Eksik Listesini GEK'e Aktar (" + Object.keys(eksikMap).length + " ürün)"}
-          </button>
-        )}
-        {gekListesiVar && (
-          <button onClick={handleTemizle} style={{
-            padding: "10px 16px", background: "rgba(239,68,68,0.1)", color: "#ef4444",
-            border: "1.5px solid #fca5a5", borderRadius: 8,
-            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          }}>
-            🗑 GEK Listesini Temizle
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function KilavuzPanel({ info }) {
   const [acik, setAcik] = useState(false);
   const [aktifBolum, setAktifBolum] = useState(null);
@@ -448,7 +358,10 @@ function Table({ rows, search, eksikMap, secilenBarkodlar, onSecimDegis }) {
                 textTransform: "uppercase", textAlign: c.align,
                 width: c.w !== "auto" ? c.w : undefined,
               }}>
-                {c.label}
+                {c.key === "secim"
+                  ? <input type="checkbox" checked={tumSecili} onChange={handleTumSecim}
+                      style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#2563EB" }} />
+                  : c.label}
               </th>
             ))}
           </tr>
@@ -460,22 +373,36 @@ function Table({ rows, search, eksikMap, secilenBarkodlar, onSecimDegis }) {
           {filtered.map((row, i) => {
             const cfg = STATUS_CONFIG[row.durum] || {};
             const eksikBilgi = eksikMap[row.barkod] || null;
+            const secili = row.barkod && secilenBarkodlar.has(row.barkod);
             return (
-              <tr key={i} style={{
-                background: eksikBilgi
-                  ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
-                  : (i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA")),
-                borderBottom: "1px solid #E2E8F0",
-              }}>
+              <tr key={i}
+                onClick={() => handleSatirSecim(row.barkod)}
+                style={{
+                  background: secili ? "#dbeafe"
+                    : eksikBilgi
+                      ? (i % 2 === 0 ? "#fffbeb" : "#fef9c3")
+                      : (i % 2 === 0 ? (cfg.bg || "#fff") : (cfg.bg ? cfg.bg + "aa" : "#FAFAFA")),
+                  borderBottom: "1px solid #E2E8F0",
+                  cursor: row.barkod ? "pointer" : "default",
+                  outline: secili ? "2px solid #93c5fd" : "none",
+                  outlineOffset: -2,
+                }}>
                 {cols.map(c => (
-                  <td key={c.key} style={{
-                    padding: "9px 12px", textAlign: c.align,
-                    color: c.key === "urun_adi" ? "#0F172A" : "#374151",
-                    fontWeight: c.key === "urun_adi" ? 600 : 400,
-                    fontFamily: c.key === "urun_adi" ? "inherit" : "'DM Mono', monospace",
-                    fontSize: c.key === "urun_adi" ? 13 : 12,
-                  }}>
-                    {c.key === "durum" ? <Badge durum={row.durum} />
+                  <td key={c.key}
+                    onClick={c.key === "secim" ? (e) => e.stopPropagation() : undefined}
+                    style={{
+                      padding: "9px 12px", textAlign: c.align,
+                      color: c.key === "urun_adi" ? "#0F172A" : "#374151",
+                      fontWeight: c.key === "urun_adi" ? 600 : 400,
+                      fontFamily: c.key === "urun_adi" ? "inherit" : "'DM Mono', monospace",
+                      fontSize: c.key === "urun_adi" ? 13 : 12,
+                    }}>
+                    {c.key === "secim"
+                      ? <input type="checkbox" checked={!!secili}
+                          onChange={() => handleSatirSecim(row.barkod)}
+                          disabled={!row.barkod}
+                          style={{ cursor: row.barkod ? "pointer" : "default", width: 16, height: 16, accentColor: "#2563EB" }} />
+                      : c.key === "durum" ? <Badge durum={row.durum} />
                       : c.key === "eksik" ? <EksikRozet eksikBilgi={eksikBilgi} />
                       : c.key === "barkod" ? (row.barkod ?? "—")
                       : fmt(row[c.key])
