@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { siparisHesapla, barkodlariniEslestir } from "./hesaplama.js";
+import { siparisHesapla, barkodListesiniYukle, barkodlariniEslestir } from "./hesaplama.js";
 
 const GEK_STORAGE_KEY = "gek_siparis_listesi";
 
@@ -446,19 +446,23 @@ export default function App() {
   const resultsRef = useRef();
 
   useEffect(() => {
-    // Info'yu frontend'de hesapla
-    try {
-      const data = siparisHesapla([]);
-      setInfo({
-        bugun_str: data.bilgi.bugun_str,
-        aktif_ay: data.bilgi.aktif_ay,
-        toplam_is_gunu: data.bilgi.toplam_is_gunu,
-        kalan_is_gunu: data.bilgi.kalan_is_gunu,
-        rapor_araligi_str: data.bilgi.rapor_araligi_str,
-        barkod_aktif: true,
-        barkod_kayit_sayisi: 8428
-      });
-    } catch(e) { setInfo(null); }
+    // Barkod listesini yükle + info hesapla
+    fetch("/data/urun_listesi.json")
+      .then(r => r.json())
+      .then(urunler => {
+        barkodListesiniYukle(urunler);
+        const data = siparisHesapla([]);
+        setInfo({
+          bugun_str: data.bilgi.bugun_str,
+          aktif_ay: data.bilgi.aktif_ay,
+          toplam_is_gunu: data.bilgi.toplam_is_gunu,
+          kalan_is_gunu: data.bilgi.kalan_is_gunu,
+          rapor_araligi_str: data.bilgi.rapor_araligi_str,
+          barkod_aktif: true,
+          barkod_kayit_sayisi: urunler.length
+        });
+      })
+      .catch(() => setInfo(null));
 
     eksikListesiniCek().then(setEksikMap);
     const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
@@ -505,19 +509,8 @@ export default function App() {
 
       if (satirlar.length === 0) throw new Error("Dosyada veri bulunamadı");
 
-      // Hesapla — tamamen tarayıcıda
+      // Hesapla — tamamen tarayıcıda, barkod eşleştirme dahil
       const data = siparisHesapla(satirlar);
-      
-      // Barkod eşleştirme — Render'da rapidfuzz ile
-      const urunAdlari = data.urunler.map(r => r.urun_adi)
-      const eslesmeler = await barkodlariniEslestir(urunAdlari)
-      
-      // Barkodları ata
-      data.urunler = data.urunler.map(r => ({
-        ...r,
-        barkod: eslesmeler[r.urun_adi] || null
-      }))
-
       setResult(data);
       eksikListesiniCek().then(setEksikMap);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
