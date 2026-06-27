@@ -222,21 +222,46 @@ export function barkodListesiniYukle(urunler) {
   _keys = Object.keys(_normDict)
 }
 
-function barkodBul(normKey) {
-  if (!_keys.length) return null
-  if (_normDict[normKey]) return _normDict[normKey]
+function enIyiEslesme(normKey, adaylar, esik) {
   const n2 = normalize2(normKey)
-  if (_norm2Dict[n2]) return _norm2Dict[n2]
-  const prefix = normKey.substring(0, 6)
-  const adaylar = _keys.filter(k => k.startsWith(prefix))
-  if (!adaylar.length) return null
   let enIyi = null, enIyiSkor = 0
   for (const aday of adaylar) {
     const a2 = normalize2(aday)
-    const skor = Math.max(levenshteinRatio(n2, a2), partialRatio(n2, a2) * 0.90)
+    const s1 = levenshteinRatio(n2, a2)
+    const s2 = partialRatio(n2, a2) * 0.90
+    const skor = Math.max(s1, s2)
     if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = aday }
   }
-  return (enIyiSkor >= 68 && enIyi) ? _normDict[enIyi] : null
+  return enIyiSkor >= esik ? enIyi : null
+}
+
+function barkodBul(normKey) {
+  if (!_keys.length) return null
+
+  // 1. Tam eşleşme
+  if (_normDict[normKey]) return _normDict[normKey]
+  const n2 = normalize2(normKey)
+  if (_norm2Dict[n2]) return _norm2Dict[n2]
+
+  // 2. Kademeli prefix + kademeli eşik
+  // Her turda prefix'i kısaltarak daha geniş aday havuzu al
+  // ve eşiği düşür
+  const turlar = [
+    { prefixUzunluk: 6, esik: 80 },
+    { prefixUzunluk: 6, esik: 70 },
+    { prefixUzunluk: 5, esik: 65 },
+    { prefixUzunluk: 4, esik: 60 },
+  ]
+
+  for (const { prefixUzunluk, esik } of turlar) {
+    const prefix = normKey.substring(0, prefixUzunluk)
+    const adaylar = _keys.filter(k => k.startsWith(prefix))
+    if (!adaylar.length) continue
+    const sonuc = enIyiEslesme(normKey, adaylar, esik)
+    if (sonuc) return _normDict[sonuc]
+  }
+
+  return null
 }
 
 // ── Ana Hesaplama ─────────────────────────────────────────────────────────
