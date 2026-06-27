@@ -8,6 +8,8 @@ from typing import Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from pydantic import BaseModel
+from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from rapidfuzz import fuzz, process as fuzz_process
@@ -711,3 +713,35 @@ async def pdf_indir(file: UploadFile = File(...)):
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=acil_siparis_listesi.pdf"}
     )
+
+
+# =========================================================
+# BARKOD EŞLEŞTİRME ENDPOINT — Frontend için
+# =========================================================
+
+class BarkodEslestirmeIstek(BaseModel):
+    urun_adlari: List[str]
+
+@app.post("/api/barkod-eslestir")
+async def barkod_eslestir(istek: BarkodEslestirmeIstek):
+    if not _barkod_lookup.loaded:
+        try:
+            import urllib.request, tempfile
+            url = "https://raw.githubusercontent.com/ozgunozyigit/eksiklistesi/main/public/data/urun_listesi.json"
+            with urllib.request.urlopen(url, timeout=30) as r:
+                data = r.read()
+            tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+            tmp.write(data)
+            tmp.close()
+            _barkod_lookup.yukle(tmp.name)
+            os.unlink(tmp.name)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Barkod listesi yuklenemedi: {e}")
+
+    sonuclar = {}
+    for urun_adi in istek.urun_adlari:
+        norm = normalize_urun_adi(str(urun_adi))
+        barkod = _barkod_lookup.bul(norm)
+        sonuclar[urun_adi] = barkod
+
+    return {"eslesmeler": sonuclar}
