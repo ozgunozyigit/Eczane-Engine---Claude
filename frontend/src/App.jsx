@@ -445,7 +445,27 @@ export default function App() {
   const resultsRef = useRef();
 
   useEffect(() => {
-    fetch(API + "/api/info").then(r => r.json()).then(setInfo).catch(() => setInfo(null));
+    // Info'yu frontend'de hesapla — backend'e gerek yok
+    import("./hesaplama.js").then(({ siparisHesapla, barkodListesiniYukle }) => {
+      // Barkod listesini yükle
+      fetch("https://raw.githubusercontent.com/ozgunozyigit/eksiklistesi/main/public/data/urun_listesi.json")
+        .then(r => r.json())
+        .then(urunler => {
+          barkodListesiniYukle(urunler);
+          // Boş hesaplama ile bilgi al
+          const data = siparisHesapla([]);
+          setInfo({
+            bugun_str: data.bilgi.bugun_str,
+            aktif_ay: data.bilgi.aktif_ay,
+            toplam_is_gunu: data.bilgi.toplam_is_gunu,
+            kalan_is_gunu: data.bilgi.kalan_is_gunu,
+            rapor_araligi_str: data.bilgi.rapor_araligi_str,
+            barkod_aktif: true,
+            barkod_kayit_sayisi: urunler.length
+          });
+        })
+        .catch(() => setInfo(null));
+    });
     eksikListesiniCek().then(setEksikMap);
     const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
     return () => clearInterval(interval);
@@ -473,12 +493,26 @@ export default function App() {
   const handleHesapla = async () => {
     if (!file) return;
     setLoading(true); setError(null); setResult(null);
-    const fd = new FormData();
-    fd.append("file", file);
     try {
-      const res = await fetch(API + "/api/hesapla", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Bilinmeyen hata");
+      // Excel'i tarayıcıda oku
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+      // Başlık satırını atla, A, B, F kolonlarını al (index 0, 1, 5)
+      const satirlar = rows.slice(1)
+        .filter(r => r && r[0])
+        .map(r => ({
+          urun_adi: r[0],
+          toplam_3ay_satis: r[1],
+          stok: r[5]
+        }));
+
+      if (satirlar.length === 0) throw new Error("Dosyada veri bulunamadı");
+
+      // Hesapla
+      const data = siparisHesapla(satirlar);
       setResult(data);
       eksikListesiniCek().then(setEksikMap);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -490,19 +524,47 @@ export default function App() {
   };
 
   const handleDownload = async (type) => {
-    if (!file) return;
+    if (!result) return;
     setDlLoading(d => ({ ...d, [type]: true }));
-    const fd = new FormData();
-    fd.append("file", file);
     try {
-      const res = await fetch(API + "/api/" + (type === "excel" ? "excel-indir" : "pdf-indir"), { method: "POST", body: fd });
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = type === "excel" ? "siparis_sonuc.xlsx" : "acil_siparis_listesi.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
+      if (type === "excel") {
+        // Excel oluştur
+        const wb = XLSX.utils.book_new();
+        const siparisData = result.urunler.map(r => ({
+          "Ürün Adı": r.urun_adi,
+          "Parti Sipariş Mik.": r.parti_siparis,
+          "Top. Sipariş Mik.": r.toplam_siparis,
+          "3 Aylık Satış": r.satis_3ay,
+          "Ort. Aylık Satış": r.ort_aylik,
+          "Stok": r.stok,
+          "Durum": r.durum
+        }));
+        const ws = XLSX.utils.json_to_sheet(siparisData);
+        XLSX.utils.book_append_sheet(wb, ws, "Sipariş Sonuç");
+        if (result.haric_tutulanlar.length > 0) {
+          const haricData = result.haric_tutulanlar.map(r => ({
+            "Ürün Adı": r.urun_adi,
+            "3 Aylık Satış": r.satis_3ay,
+            "Stok": r.stok,
+            "Sebep": r.sebep
+          }));
+          const ws2 = XLSX.utils.json_to_sheet(haricData);
+          XLSX.utils.book_append_sheet(wb, ws2, "Liste Dışı");
+        }
+        XLSX.writeFile(wb, "siparis_sonuc.xlsx");
+      } else {
+        // PDF için backend'e gönder — sadece PDF için Render kullanılıyor
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("https://eczane-engine-claude.onrender.com/api/pdf-indir", { method: "POST", body: fd });
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "acil_siparis_listesi.pdf";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     } catch (e) {
       console.error("İndirme hatası:", e.message);
     } finally {
