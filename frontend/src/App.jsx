@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { siparisHesapla, barkodListesiniYukle } from "./hesaplama.js";
+import { siparisHesapla, barkodlariniEslestir } from "./hesaplama.js";
 
 const GEK_STORAGE_KEY = "gek_siparis_listesi";
 
@@ -446,23 +446,19 @@ export default function App() {
   const resultsRef = useRef();
 
   useEffect(() => {
-    // Barkod listesini yükle ve info'yu hesapla
-    fetch("/data/urun_listesi.json")
-      .then(r => r.json())
-      .then(urunler => {
-        barkodListesiniYukle(urunler);
-        const data = siparisHesapla([]);
-        setInfo({
-          bugun_str: data.bilgi.bugun_str,
-          aktif_ay: data.bilgi.aktif_ay,
-          toplam_is_gunu: data.bilgi.toplam_is_gunu,
-          kalan_is_gunu: data.bilgi.kalan_is_gunu,
-          rapor_araligi_str: data.bilgi.rapor_araligi_str,
-          barkod_aktif: true,
-          barkod_kayit_sayisi: urunler.length
-        });
-      })
-      .catch(() => setInfo(null));
+    // Info'yu frontend'de hesapla
+    try {
+      const data = siparisHesapla([]);
+      setInfo({
+        bugun_str: data.bilgi.bugun_str,
+        aktif_ay: data.bilgi.aktif_ay,
+        toplam_is_gunu: data.bilgi.toplam_is_gunu,
+        kalan_is_gunu: data.bilgi.kalan_is_gunu,
+        rapor_araligi_str: data.bilgi.rapor_araligi_str,
+        barkod_aktif: true,
+        barkod_kayit_sayisi: 8428
+      });
+    } catch(e) { setInfo(null); }
 
     eksikListesiniCek().then(setEksikMap);
     const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
@@ -492,13 +488,13 @@ export default function App() {
     if (!file) return;
     setLoading(true); setError(null); setResult(null);
     try {
-      // Excel'i tarayıcıda oku
+        // Excel'i tarayıcıda oku
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-      // Başlık satırını atla, A, B, F kolonlarını al (index 0, 1, 5)
+      // Başlık satırını atla, A (0), B (1), F (5) kolonlarını al
       const satirlar = rows.slice(1)
         .filter(r => r && r[0])
         .map(r => ({
@@ -509,8 +505,19 @@ export default function App() {
 
       if (satirlar.length === 0) throw new Error("Dosyada veri bulunamadı");
 
-      // Hesapla
+      // Hesapla — tamamen tarayıcıda
       const data = siparisHesapla(satirlar);
+      
+      // Barkod eşleştirme — Render'da rapidfuzz ile
+      const urunAdlari = data.urunler.map(r => r.urun_adi)
+      const eslesmeler = await barkodlariniEslestir(urunAdlari)
+      
+      // Barkodları ata
+      data.urunler = data.urunler.map(r => ({
+        ...r,
+        barkod: eslesmeler[r.urun_adi] || null
+      }))
+
       setResult(data);
       eksikListesiniCek().then(setEksikMap);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
