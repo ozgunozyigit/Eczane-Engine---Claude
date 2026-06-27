@@ -198,60 +198,27 @@ function siparisDurumuBelirle(row) {
 }
 
 // ── Barkod Eşleştirme ─────────────────────────────────────────────────────
-let _barkodDict = null
-let _barkodDict2 = null
-let _barkodKeys = null
+const BACKEND_URL = "https://eczane-engine-claude.onrender.com"
 
-export function barkodListesiniYukle(urunler) {
-  _barkodDict = {}
-  _barkodDict2 = {}
-  for (const u of urunler) {
-    if (!u.barkod || !u.ad) continue
-    const norm = normalizeUrunAdi(u.ad)
-    if (!norm) continue
-    _barkodDict[norm] = String(u.barkod)
-    _barkodDict2[normalize2(norm)] = String(u.barkod)
+// Barkod eşleştirme — Render'daki rapidfuzz kullanır
+export async function barkodlariniEslestir(urunAdlari) {
+  try {
+    const res = await fetch(BACKEND_URL + "/api/barkod-eslestir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urun_adlari: urunAdlari })
+    })
+    if (!res.ok) return {}
+    const data = await res.json()
+    return data.eslesmeler || {}
+  } catch (e) {
+    console.warn("Barkod eşleştirme hatası:", e.message)
+    return {}
   }
-  _barkodKeys = Object.keys(_barkodDict)
 }
 
-function barkodBul(normKey) {
-  if (!_barkodDict) return null
-  // 1. Tam eşleşme
-  if (_barkodDict[normKey]) return _barkodDict[normKey]
-  const n2 = normalize2(normKey)
-  if (_barkodDict2[n2]) return _barkodDict2[n2]
-  // 2. Prefix ile aday bul (ilk 6 karakter)
-  const prefix = normKey.substring(0, 6)
-  const adaylar = _barkodKeys.filter(k => k.startsWith(prefix))
-  if (adaylar.length === 0) return null
-  // 3. ratio + partial_ratio ile en iyi eşleşmeyi bul
-  let enIyi = null, enIyiSkor = 0
-  for (const aday of adaylar) {
-    const a2 = normalize2(aday)
-    const s1 = benzerlikSkoru(n2, a2)
-    const s2 = partialBenzerlik(n2, a2) * 0.90
-    const skor = Math.max(s1, s2)
-    if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = aday }
-  }
-  return (enIyiSkor >= 68 && enIyi) ? _barkodDict[enIyi] : null
-}
-
-// Partial ratio — kısa string uzun string içinde aranır
-function partialBenzerlik(a, b) {
-  if (a.length === 0 || b.length === 0) return 0
-  // Kısa olanı uzun olanda kaydırarak ara
-  const [kisa, uzun] = a.length <= b.length ? [a, b] : [b, a]
-  const w = kisa.length
-  let enIyi = 0
-  for (let i = 0; i <= uzun.length - w; i++) {
-    const alt = uzun.substring(i, i + w)
-    const skor = benzerlikSkoru(kisa, alt)
-    if (skor > enIyi) enIyi = skor
-    if (enIyi === 100) break
-  }
-  return enIyi
-}
+// Eski fonksiyon — artık kullanılmıyor ama import hatası olmasın
+export function barkodListesiniYukle() {}
 
 // Levenshtein ratio — rapidfuzz.fuzz.ratio ile aynı mantık
 function benzerlikSkoru(a, b) {
@@ -353,7 +320,7 @@ export function siparisHesapla(satirlar) {
     const oncelik = {"ACİL":1,"SİPARİŞ":2,"DÜŞÜK DEVİRLİ SİPARİŞ":3,"GEREK YOK":4}
     row.siparis_onceligi = oncelik[row.siparis_durumu] || 99
     row.gorunen_urun_adi = gorunenUrunAdiOlustur(normAd)
-    row.barkod = barkodBul(normAd)
+    row.barkod = null // Barkodlar ayrıca eşleştirilecek
 
     urunler.push(row)
   }
