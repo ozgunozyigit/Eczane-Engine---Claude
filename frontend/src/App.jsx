@@ -446,27 +446,24 @@ export default function App() {
   const resultsRef = useRef();
 
   useEffect(() => {
-    // Info'yu frontend'de hesapla — backend'e gerek yok
-    import("./hesaplama.js").then(({ siparisHesapla, barkodListesiniYukle }) => {
-      // Barkod listesini yükle
-      fetch("/data/urun_listesi.json")
-        .then(r => r.json())
-        .then(urunler => {
-          barkodListesiniYukle(urunler);
-          // Boş hesaplama ile bilgi al
-          const data = siparisHesapla([]);
-          setInfo({
-            bugun_str: data.bilgi.bugun_str,
-            aktif_ay: data.bilgi.aktif_ay,
-            toplam_is_gunu: data.bilgi.toplam_is_gunu,
-            kalan_is_gunu: data.bilgi.kalan_is_gunu,
-            rapor_araligi_str: data.bilgi.rapor_araligi_str,
-            barkod_aktif: true,
-            barkod_kayit_sayisi: urunler.length
-          });
-        })
-        .catch(() => setInfo(null));
-    });
+    // Barkod listesini yükle ve info'yu hesapla
+    fetch("/data/urun_listesi.json")
+      .then(r => r.json())
+      .then(urunler => {
+        barkodListesiniYukle(urunler);
+        const data = siparisHesapla([]);
+        setInfo({
+          bugun_str: data.bilgi.bugun_str,
+          aktif_ay: data.bilgi.aktif_ay,
+          toplam_is_gunu: data.bilgi.toplam_is_gunu,
+          kalan_is_gunu: data.bilgi.kalan_is_gunu,
+          rapor_araligi_str: data.bilgi.rapor_araligi_str,
+          barkod_aktif: true,
+          barkod_kayit_sayisi: urunler.length
+        });
+      })
+      .catch(() => setInfo(null));
+
     eksikListesiniCek().then(setEksikMap);
     const interval = setInterval(() => eksikListesiniCek().then(setEksikMap), 60000);
     return () => clearInterval(interval);
