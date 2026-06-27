@@ -230,11 +230,11 @@ function barkodBul(normKey) {
   for (const aday of adaylar) {
     const a2 = normalize2(aday)
     const s1 = benzerlikSkoru(n2, a2)
-    const s2 = partialBenzerlik(n2, a2) * 0.85
+    const s2 = partialBenzerlik(n2, a2) * 0.90
     const skor = Math.max(s1, s2)
     if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = aday }
   }
-  return (enIyiSkor >= 72 && enIyi) ? _barkodDict[enIyi] : null
+  return (enIyiSkor >= 68 && enIyi) ? _barkodDict[enIyi] : null
 }
 
 // Partial ratio — kısa string uzun string içinde aranır
